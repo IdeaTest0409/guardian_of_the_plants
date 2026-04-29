@@ -1,0 +1,41 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/*.apk
+android/app-*.apk
+*.apk
+
+# Kotlin / Java
+*.class
+out/
+
+# Docker / database runtime data
+postgres_data/
+db/data/
+voicevox_data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
