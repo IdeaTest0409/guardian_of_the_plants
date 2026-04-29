@@ -11,20 +11,18 @@ Android app start
 
 ## Start Docker Services
 
-Run only the services needed for this smoke test:
+Run the services needed for this smoke test:
 
 ```powershell
 cd C:\work\guardian_of_the_plants
-docker compose up -d db nginx
+docker compose up -d --build db server nginx
 docker compose ps
 ```
 
 `voicevox` is profile-gated and is not needed for this test.
 
-Note: during this first local smoke test, PostgreSQL is published to the host on
-port `5432` for easier inspection. After this path works end to end, the
-security follow-up is to Dockerize Spring Boot and publish only nginx
-externally.
+Only nginx is published to the host. Spring Boot and PostgreSQL communicate on
+the internal Docker Compose network.
 
 Check nginx itself:
 
@@ -37,19 +35,6 @@ Expected:
 ```text
 nginx ok
 ```
-
-## Start Server
-
-Run Spring Boot on the host machine. nginx proxies `/api/` to
-`host.docker.internal:8080`.
-
-```powershell
-cd C:\work\guardian_of_the_plants\server
-gradle bootRun
-```
-
-If `gradle` is not on `PATH`, use an installed Gradle executable or add a server
-Gradle Wrapper later.
 
 ## Check API Through nginx
 
@@ -139,3 +124,17 @@ You can also pass the URL without editing `local.properties`:
 
 The app sends `POST /api/app-start` once during `MainActivity.onCreate`.
 Failures are logged locally and do not block the UI.
+
+## Stop Services
+
+Stop containers while keeping PostgreSQL data:
+
+```powershell
+docker compose down
+```
+
+Stop containers and reset PostgreSQL data:
+
+```powershell
+docker compose down -v
+```
