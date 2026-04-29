@@ -58,6 +58,9 @@ class MainActivity : ComponentActivity() {
             "App launched",
             details = "savedInstanceState=${savedInstanceState != null}",
         )
+        lifecycleScope.launch {
+            container.appStartReporter.report(applicationContext)
+        }
         fun disableAvatarExpressionAfterCrash(source: String) {
             lifecycleScope.launch {
                 runCatching {

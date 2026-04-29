@@ -8,6 +8,7 @@ import com.example.smartphonapptest001.data.logging.AppLogger
 import com.example.smartphonapptest001.data.logging.FileAppLogger
 import com.example.smartphonapptest001.data.local.LocalModelService
 import com.example.smartphonapptest001.data.model.PlantProfileRepository
+import com.example.smartphonapptest001.data.network.AppStartReporter
 import com.example.smartphonapptest001.data.network.KtorOllamaNativeChatApi
 import com.example.smartphonapptest001.data.network.KtorOpenAiCompatibleChatApi
 import com.example.smartphonapptest001.data.repository.DefaultChatRepository
@@ -54,4 +55,5 @@ class DefaultAppContainer(context: Context) {
 
     val settingsRepository = DataStoreSettingsRepository(context)
     val chatRepository = DefaultChatRepository(chatApi, ollamaNativeChatApi, localModelService, appLogger)
+    val appStartReporter = AppStartReporter(httpClient, appLogger)
 }

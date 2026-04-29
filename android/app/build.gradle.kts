@@ -5,6 +5,26 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+fun String.asBuildConfigString(): String =
+    "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+fun readLocalProperty(name: String): String {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (!localPropertiesFile.isFile) return ""
+    return localPropertiesFile.readLines()
+        .asSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") }
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter("=")
+        ?.trim()
+        .orEmpty()
+}
+
+val guardianApiBaseUrl = providers.gradleProperty("guardianApiBaseUrl")
+    .orElse(readLocalProperty("guardian.api.baseUrl"))
+    .get()
+
 android {
     namespace = "com.example.smartphonapptest001"
     compileSdk = 35
@@ -16,6 +36,7 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GUARDIAN_API_BASE_URL", guardianApiBaseUrl.asBuildConfigString())
     }
 
     buildTypes {
@@ -39,6 +60,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

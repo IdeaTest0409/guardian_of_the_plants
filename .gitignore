@@ -29,6 +29,8 @@ android/app-*.apk
 # Kotlin / Java
 *.class
 out/
+server/.gradle/
+server/build/
 
 # Docker / database runtime data
 postgres_data/
