@@ -86,7 +86,16 @@ guardian_of_the_plants/
     opencode-handoff.md
   nginx/
     default.conf        Local nginx reverse proxy config
-  server/               Empty; Spring Boot server should be created here later
+  server/               Spring Boot server (JDK 17)
+    src/.../guardianplants/
+      GuardianPlantsServerApplication.java
+      ChatHistoryRepository.java
+      config/WebClientConfig.java
+      controller/ChatController.java         POST /api/chat (SSE)
+      dto/ChatRequest.java
+      dto/ServerMessage.java
+      service/ChatService.java               SSE proxy + DB storage
+      service/ProviderResolver.java          .env provider config
   .env                  Local secrets, ignored by Git
   .env.example          Shared environment template
   .gitattributes
@@ -123,11 +132,16 @@ Android app
       -> external AI / Ollama Cloud
 ```
 
-Verified milestone:
+Verified milestones:
 
 ```text
 Android app sends one log entry to the server.
 Server stores it in PostgreSQL app_logs.
+
+Android app sends chat messages to /api/chat via SSE.
+Spring Boot proxies to AI provider (Ollama Cloud / configured provider).
+PostgreSQL chat_histories stores user + assistant messages.
+No AI API keys on the Android device.
 ```
 
 This has been verified locally and on an Ubuntu VPS. Smartphone app-start rows
@@ -136,6 +150,14 @@ from `Xiaomi/2602BPC18G` reached `app_logs` through:
 ```text
 Android -> VPS nginx -> server container -> PostgreSQL container
 ```
+
+Android `ProviderType.SERVER` provider added. Chat routes through:
+
+```text
+Android (SERVER) -> nginx -> server (SSE proxy) -> AI provider (configured in .env)
+```
+
+Existing LOCAL / CLOUD / OLLAMA_CLOUD providers remain functional.
 
 ## Android App State
 
@@ -581,21 +603,36 @@ be generated with the local Android SDK path. Do not commit APK outputs,
 
 Do not start with the full VPS architecture. Proceed in small validated steps.
 
-1. Add HTTPS/TLS for the VPS nginx endpoint.
-2. Decide how Android should configure or discover the production API endpoint.
-3. Move AI key handling from Android toward server-side `.env`.
-4. Only after logging works reliably, consider VOICEVOX integration.
-5. Later, move RAG/knowledge management server-side.
+1. Confirm Android `SERVER` provider builds and runs with configured endpoint.
+2. Verify `POST /api/chat` SSE streaming through nginx to server to AI provider.
+3. Verify `chat_histories` rows are inserted in PostgreSQL during/after streaming.
+4. Add HTTPS/TLS for the VPS nginx endpoint.
+5. Decide how Android should configure or discover the production API endpoint.
+6. Only after chat works reliably, consider VOICEVOX integration.
+7. Later, move RAG/knowledge management server-side.
 
-## First Success Criteria
+## Completed Milestones
 
-The first milestone has been met:
+### Milestone 1: App Start Logging
 
 ```text
 Android app sends one log entry.
-Spring Boot receives it.
+Spring Boot receive it.
 PostgreSQL app_logs stores it.
 The Android app still works even if the server is unavailable.
+```
+
+### Milestone 2: Server-Side Chat API (2026-04-30)
+
+```text
+Android app sends chat messages to /api/chat via SSE.
+Spring Boot proxies to AI provider (Ollama Cloud / configured provider).
+SSE stream flows: AI provider -> server -> Android.
+PostgreSQL chat_histories stores user + assistant messages.
+No AI API keys on the Android device.
+Provider selection is server-side (.env).
+Android ProviderType.SERVER routes through VPS.
+Existing LOCAL / CLOUD / OLLAMA_CLOUD providers remain functional.
 ```
 
 ## Git Commands For opencode

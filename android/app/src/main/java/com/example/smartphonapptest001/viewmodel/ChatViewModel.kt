@@ -457,7 +457,7 @@ class ChatViewModel(
                             personality = activeSettings.guardianAngelPersonality,
                         ),
                     )
-                    if (activeSettings.providerType == ProviderType.OLLAMA_CLOUD) {
+                    if (activeSettings.providerType == ProviderType.OLLAMA_CLOUD || activeSettings.providerType == ProviderType.SERVER) {
                         appendLine()
                         appendLine()
                         appendLine("Ollama Cloud strict response rules:")
@@ -517,7 +517,7 @@ class ChatViewModel(
                 appendLine("systemPromptChars=${diagnosticConversation.first().content.length}")
                 appendLine("cacheKey=$cacheKey")
                 appendLine("questionNeedsImageDiagnostic=${userMessage.content.needsImageDiagnostic()}")
-                appendLine("ollamaStrictJson=${activeSettings.providerType == ProviderType.OLLAMA_CLOUD}")
+                appendLine("ollamaStrictJson=${activeSettings.providerType == ProviderType.OLLAMA_CLOUD || activeSettings.providerType == ProviderType.SERVER}")
             },
         )
 
@@ -772,6 +772,16 @@ class ChatViewModel(
                 append(settings.ollamaCloudBaseUrl.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL })
                 append(" | ")
                 append(settings.ollamaCloudModel.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL })
+            }
+
+            ProviderType.SERVER -> buildString {
+                append("Server / VPS")
+                append(" | ")
+                append(activePlantProfile.displayName)
+                append(" | ")
+                append(settings.companionRole.label)
+                append(" | ")
+                append(settings.guardianAngelDisplayName)
             }
         }
     }

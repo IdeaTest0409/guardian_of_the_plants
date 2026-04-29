@@ -177,6 +177,7 @@ fun SettingsScreen(
                 ProviderType.LOCAL -> "Current mode: Local / on-device"
                 ProviderType.CLOUD -> "Current mode: Cloud / LM Studio"
                 ProviderType.OLLAMA_CLOUD -> "Current mode: Cloud / Ollama"
+                ProviderType.SERVER -> "Current mode: Server / VPS"
             },
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -193,6 +194,8 @@ fun SettingsScreen(
                     "Cloud runtime: ${state.cloudBaseUrl.ifBlank { "unset" }} | ${state.cloudModel.ifBlank { "unset model" }}"
                 state.providerType == ProviderType.OLLAMA_CLOUD ->
                     "Ollama Cloud: ${state.ollamaCloudBaseUrl.ifBlank { "unset" }} | ${state.ollamaCloudModel.ifBlank { "unset model" }}"
+                state.providerType == ProviderType.SERVER ->
+                    "Server VPS endpoint configured via local.properties"
                 else -> "Runtime: unknown"
             },
             style = MaterialTheme.typography.bodySmall,
@@ -281,6 +284,7 @@ fun SettingsScreen(
                 ProviderType.LOCAL -> "Local on-device"
                 ProviderType.CLOUD -> "Cloud LM Studio"
                 ProviderType.OLLAMA_CLOUD -> "Cloud Ollama"
+                ProviderType.SERVER -> "Server VPS"
             },
             expanded = providerMenuExpanded,
             onExpandedChange = { providerMenuExpanded = it },
@@ -304,6 +308,13 @@ fun SettingsScreen(
                 text = { Text("Cloud Ollama") },
                 onClick = {
                     onProviderTypeChange(ProviderType.OLLAMA_CLOUD)
+                    providerMenuExpanded = false
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("Server VPS") },
+                onClick = {
+                    onProviderTypeChange(ProviderType.SERVER)
                     providerMenuExpanded = false
                 },
             )
@@ -751,6 +762,20 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Ollama API key") },
                 supportingText = { Text("Required for Ollama Cloud. Stored on this device.") },
+            )
+        }
+
+        if (state.providerType == ProviderType.SERVER) {
+            SectionLabel("Server VPS")
+            Text(
+                text = "AI requests are sent through your VPS server. The server handles AI provider selection and API keys. No configuration needed on this device.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Configure guardian.api.baseUrl in android/local.properties to set the server endpoint.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 

@@ -11,6 +11,8 @@ import com.example.smartphonapptest001.data.model.ChatRole
 import com.example.smartphonapptest001.data.model.ProviderType
 import com.example.smartphonapptest001.data.network.KtorOllamaNativeChatApi
 import com.example.smartphonapptest001.data.network.KtorOpenAiCompatibleChatApi
+import com.example.smartphonapptest001.data.network.ServerChatApi
+import com.example.smartphonapptest001.data.network.ServerMessage
 import com.example.smartphonapptest001.data.network.toOllamaNativeRequest
 import com.example.smartphonapptest001.data.network.toOpenAiRequest
 import kotlinx.coroutines.flow.Flow
@@ -18,11 +20,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 
 class DefaultChatRepository(
     private val api: KtorOpenAiCompatibleChatApi,
     private val ollamaNativeApi: KtorOllamaNativeChatApi,
     private val localModelService: LocalModelService,
+    private val serverChatApi: ServerChatApi,
     private val logger: AppLogger,
 ) : ChatRepository {
     private val aiRequestMutex = Mutex()
@@ -172,6 +176,38 @@ class DefaultChatRepository(
                         TAG,
                         "Local completion finished",
                         details = "replyChars=${reply.length}\nreply=$reply",
+                    )
+                    reply
+                }
+
+                ProviderType.SERVER -> {
+                    logger.log(
+                        AppLogSeverity.INFO,
+                        TAG,
+                        "Using server-side model via VPS",
+                        details = buildString {
+                            appendLine("baseUrl=${settings.activeEndpointConfig.baseUrl}")
+                            appendLine("provider=${settings.providerType}")
+                        },
+                    )
+                    val serverMessages = messages.toServerMessages()
+                    val conversationId = messages.findConversationId()
+                    val reply = serverChatApi.complete(
+                        messages = serverMessages,
+                        deviceId = "android",
+                        conversationId = conversationId,
+                        options = mapOf(
+                            "temperature" to settings.temperature,
+                            "maxTokens" to settings.maxOutputTokens,
+                            "top_k" to settings.topK,
+                            "top_p" to settings.topP,
+                        ),
+                    )
+                    logger.log(
+                        AppLogSeverity.INFO,
+                        TAG,
+                        "Server completion finished",
+                        details = "replyChars=${reply.length}",
                     )
                     reply
                 }
@@ -326,6 +362,39 @@ class DefaultChatRepository(
                     )
                     localModelService.stream(messages, settings).collect { emit(it) }
                 }
+
+                ProviderType.SERVER -> {
+                    logger.log(
+                        AppLogSeverity.INFO,
+                        TAG,
+                        "Streaming with server-side model via VPS",
+                        details = buildString {
+                            appendLine("baseUrl=${settings.activeEndpointConfig.baseUrl}")
+                            appendLine("provider=${settings.providerType}")
+                        },
+                    )
+                    val serverMessages = messages.toServerMessages()
+                    val conversationId = messages.findConversationId()
+                    serverChatApi.stream(
+                        messages = serverMessages,
+                        deviceId = "android",
+                        conversationId = conversationId,
+                        options = mapOf(
+                            "temperature" to settings.temperature,
+                            "maxTokens" to settings.maxOutputTokens,
+                            "top_k" to settings.topK,
+                            "top_p" to settings.topP,
+                        ),
+                    ).collect { token ->
+                        logger.log(
+                            AppLogSeverity.DEBUG,
+                            TAG,
+                            "Server streaming chunk received",
+                            details = "chars=${token.text.length}\nfinished=${token.finished}",
+                        )
+                        emit(token.text)
+                    }
+                }
             }
             logger.log(
                 AppLogSeverity.INFO,
@@ -342,6 +411,21 @@ class DefaultChatRepository(
     private companion object {
         const val TAG = "ChatRepository"
     }
+}
+
+private fun List<ChatMessage>.toServerMessages(): List<ServerMessage> =
+    map { msg ->
+        val role = when (msg.role) {
+            ChatRole.SYSTEM -> "system"
+            ChatRole.USER -> "user"
+            ChatRole.ASSISTANT -> "assistant"
+        }
+        ServerMessage(role = role, content = msg.content)
+    }
+
+private fun List<ChatMessage>.findConversationId(): String {
+    val userMsg = firstOrNull { it.role == ChatRole.USER }
+    return userMsg?.id?.take(36) ?: UUID.randomUUID().toString()
 }
 
 private fun String.toOpenAiChatCompletionsUrlForLog(): String {

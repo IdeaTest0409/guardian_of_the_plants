@@ -1,5 +1,7 @@
 package com.example.smartphonapptest001.data.model
 
+import com.example.smartphonapptest001.BuildConfig
+
 data class AppSettings(
     val providerType: ProviderType = DEFAULT_PROVIDER_TYPE,
     val plantSpecies: PlantSpecies = PlantSpecies.default(),
@@ -63,6 +65,14 @@ data class AppSettings(
                     displayName = resolvedOllamaCloudModel,
                 ),
             )
+
+            ProviderType.SERVER -> AIProvider.Server(
+                endpointConfig = activeEndpointConfig,
+                modelConfig = ModelConfig(
+                    id = "server",
+                    displayName = "Server (VPS)",
+                ),
+            )
         }
 
     val plantDisplayName: String
@@ -95,6 +105,13 @@ data class AppSettings(
                 model = resolvedOllamaCloudModel,
                 apiKey = ollamaCloudApiKey.trim().ifBlank { null },
                 streamResponses = streamResponses,
+            )
+
+            ProviderType.SERVER -> EndpointConfig(
+                baseUrl = BuildConfig.GUARDIAN_API_BASE_URL.trim(),
+                model = "server",
+                apiKey = null,
+                streamResponses = true,
             )
         }
 

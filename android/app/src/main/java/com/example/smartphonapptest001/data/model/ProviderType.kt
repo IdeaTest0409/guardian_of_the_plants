@@ -4,4 +4,5 @@ enum class ProviderType {
     LOCAL,
     CLOUD,
     OLLAMA_CLOUD,
+    SERVER,
 }

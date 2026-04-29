@@ -17,4 +17,11 @@ sealed interface AIProvider {
         override val endpointConfig: EndpointConfig,
         override val modelConfig: ModelConfig,
     ) : AIProvider
+
+    data class Server(
+        override val endpointConfig: EndpointConfig,
+        override val modelConfig: ModelConfig,
+    ) : AIProvider {
+        override val type: ProviderType = ProviderType.SERVER
+    }
 }

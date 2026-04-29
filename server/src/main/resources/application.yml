@@ -9,3 +9,9 @@ spring:
     username: ${POSTGRES_USER:guardian_user}
     password: ${POSTGRES_PASSWORD:guardian_password}
     driver-class-name: org.postgresql.Driver
+
+ai:
+  provider:
+    base-url: ${AI_BASE_URL:https://ollama.com/v1}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:gemma4:31b-cloud}

@@ -1,0 +1,24 @@
+package com.example.smartphonapptest001.data.network
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ServerChatRequest(
+    @SerialName("deviceId")
+    val deviceId: String,
+    @SerialName("conversationId")
+    val conversationId: String,
+    @SerialName("messages")
+    val messages: List<ServerMessage>,
+    @SerialName("options")
+    val options: Map<String, Any>? = null,
+)
+
+@Serializable
+data class ServerMessage(
+    @SerialName("role")
+    val role: String,
+    @SerialName("content")
+    val content: String,
+)

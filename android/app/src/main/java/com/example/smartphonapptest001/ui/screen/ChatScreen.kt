@@ -201,6 +201,8 @@ fun ChatScreen(
         }
         val statusText = if (providerType == ProviderType.LOCAL) {
             "Local • ${compactLocalStatus(localRuntimeState, localExecutionBackend)}"
+        } else if (providerType == ProviderType.SERVER) {
+            "Server VPS • ${state.activeProviderSummary}"
         } else {
             "Cloud • ${state.activeProviderSummary}"
         }

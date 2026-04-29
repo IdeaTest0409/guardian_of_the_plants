@@ -1,6 +1,7 @@
 package com.example.smartphonapptest001.data
 
 import android.content.Context
+import com.example.smartphonapptest001.BuildConfig
 import com.example.smartphonapptest001.data.knowledge.AssetPlantKnowledgeRepository
 import com.example.smartphonapptest001.data.knowledge.PlantKnowledgeRepository
 import com.example.smartphonapptest001.data.logging.AppCrashReporter
@@ -11,6 +12,7 @@ import com.example.smartphonapptest001.data.model.PlantProfileRepository
 import com.example.smartphonapptest001.data.network.AppStartReporter
 import com.example.smartphonapptest001.data.network.KtorOllamaNativeChatApi
 import com.example.smartphonapptest001.data.network.KtorOpenAiCompatibleChatApi
+import com.example.smartphonapptest001.data.network.ServerChatApi
 import com.example.smartphonapptest001.data.repository.DefaultChatRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -53,7 +55,15 @@ class DefaultAppContainer(context: Context) {
         json = json,
     )
 
+    private val serverChatApiBaseUrl = BuildConfig.GUARDIAN_API_BASE_URL.trim().trimEnd('/')
+    private val serverChatApi = ServerChatApi(
+        client = httpClient,
+        json = json,
+        logger = appLogger,
+        baseUrl = serverChatApiBaseUrl,
+    )
+
     val settingsRepository = DataStoreSettingsRepository(context)
-    val chatRepository = DefaultChatRepository(chatApi, ollamaNativeChatApi, localModelService, appLogger)
+    val chatRepository = DefaultChatRepository(chatApi, ollamaNativeChatApi, localModelService, serverChatApi, appLogger)
     val appStartReporter = AppStartReporter(httpClient, appLogger)
 }
