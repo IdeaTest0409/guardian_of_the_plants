@@ -75,6 +75,24 @@ running the Gradle Wrapper.
 Android Studio usually creates it automatically when opening the `android/`
 project.
 
+A template is available at:
+
+```text
+android/local.properties.example
+```
+
+Copy it to `android/local.properties` and fill only local values:
+
+```bash
+cp android/local.properties.example android/local.properties
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item android\local.properties.example android\local.properties
+```
+
 For command-line builds, create it only if Gradle cannot find the Android SDK
 through the environment. The file should contain the local SDK path:
 
@@ -96,6 +114,15 @@ sdk.dir=/home/<user>/Android/Sdk
 
 In CI, prefer using `ANDROID_HOME` or `ANDROID_SDK_ROOT` when available, or
 generate `local.properties` during the workflow.
+
+Temporary app-start reporting can also be configured in `local.properties`:
+
+```properties
+guardian.api.baseUrl=http://<SERVER_IP_OR_HOSTNAME>/api
+```
+
+This value is compiled into the debug APK. Keep `local.properties` out of Git.
+If the value is blank or missing, the Android app skips app-start reporting.
 
 ## Build Debug APK
 

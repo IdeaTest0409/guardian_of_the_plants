@@ -95,6 +95,14 @@ For this temporary app-start reporting feature, set the API URL through
 `android/local.properties` or a Gradle property. This keeps the URL out of Git
 and avoids adding UI settings.
 
+Use the template:
+
+```powershell
+Copy-Item android\local.properties.example android\local.properties
+```
+
+Then set `guardian.api.baseUrl`.
+
 Example for Android emulator:
 
 ```properties

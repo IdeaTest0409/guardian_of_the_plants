@@ -1,0 +1,18 @@
+# Copy this file to local.properties for local Android builds.
+# Do not commit local.properties.
+
+# Android SDK path. Android Studio usually creates this automatically.
+# Windows example:
+# sdk.dir=C\:\\Users\\<user>\\AppData\\Local\\Android\\Sdk
+# Linux example:
+# sdk.dir=/home/<user>/Android/Sdk
+
+# Optional temporary app-start reporting endpoint.
+# If blank or missing, the Android app skips POST /api/app-start.
+#
+# Emulator example:
+# guardian.api.baseUrl=http://10.0.2.2/api
+#
+# Physical device or VPS example:
+# guardian.api.baseUrl=http://<SERVER_IP_OR_HOSTNAME>/api
+guardian.api.baseUrl=
