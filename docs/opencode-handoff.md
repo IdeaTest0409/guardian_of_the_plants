@@ -80,6 +80,7 @@ guardian_of_the_plants/
   docs/
     android-migration-list.md
     android-build.md
+    local-api-smoke-test.md
     opencode-handoff.md
   nginx/
     default.conf        Local nginx reverse proxy config
@@ -363,6 +364,7 @@ Services:
 
 - `nginx`
 - `db`
+- `server` should be added to Docker Compose later
 - `voicevox`
 
 Normal local startup:
@@ -400,10 +402,19 @@ Current `/api/` proxy target:
 proxy_pass http://host.docker.internal:8080;
 ```
 
-Meaning:
+Current meaning:
 
 - nginx runs in Docker.
 - Spring Boot is expected to run on the Windows host at port `8080`.
+- This is acceptable for the first local smoke test, but not the target VPS layout.
+
+Future target after local smoke testing:
+
+```nginx
+proxy_pass http://server:8080;
+```
+
+At that point, Spring Boot should run as a Compose service named `server`.
 
 ### PostgreSQL
 
@@ -496,34 +507,31 @@ C:\work\guardian_of_the_plants\server
 Current state:
 
 ```text
-Empty. Spring Boot project has not been created yet.
+Spring Boot project exists.
 ```
 
-Recommended first server APIs:
+Current first server APIs:
 
 ```text
 GET  /api/health
-POST /api/logs
+POST /api/app-start
 ```
 
-Example log request body:
+Example app-start request body:
 
 ```json
 {
   "deviceId": "android-test",
   "appVersion": "1.0.0",
-  "severity": "INFO",
-  "category": "ChatViewModel",
-  "message": "test log",
   "details": {}
 }
 ```
 
-Recommended behavior:
+Current behavior:
 
-- Validate required fields minimally.
-- Store into `app_logs`.
-- Return a simple success response with the inserted ID.
+- Stores `APP_START` rows into `app_logs`.
+- Returns a simple success response with the inserted ID.
+- Detailed local verification steps are in `docs\local-api-smoke-test.md`.
 
 ## Android Build Notes
 
@@ -570,16 +578,14 @@ be generated with the local Android SDK path. Do not commit APK outputs,
 
 Do not start with the full VPS architecture. Proceed in small validated steps.
 
-1. Confirm Android project builds from the new location.
-2. Start local Docker DB/nginx.
-3. Create minimal Spring Boot server in `server/`.
-4. Implement `GET /api/health`.
-5. Implement `POST /api/logs`.
-6. Verify inserts into PostgreSQL `app_logs`.
-7. Add Android server-side log sender that fails silently and does not break app behavior.
-8. Send one log from Android and confirm it appears in DB.
-9. Only after logging works, consider VOICEVOX integration.
-10. Later, move AI key handling and RAG/knowledge management server-side.
+1. Finish local smoke testing with Docker `db` / `nginx`, host Spring Boot, and `POST /api/app-start`.
+2. Build and run the Android APK with `guardian.api.baseUrl` configured in `android/local.properties`.
+3. Confirm one Android app start reaches PostgreSQL `app_logs`.
+4. Dockerize Spring Boot and add it as a Compose `server` service.
+5. Change nginx `/api/` proxy from `host.docker.internal:8080` to `server:8080`.
+6. Lock down Compose networking so only nginx is externally published.
+7. Only after logging works end to end, consider VOICEVOX integration.
+8. Later, move AI key handling and RAG/knowledge management server-side.
 
 ## Suggested First Success Criteria
 
@@ -661,6 +667,59 @@ android/local.properties
 - CPU-heavy.
 - May need async job flow.
 - Do not block Android UI while generating audio.
+
+## Homework After Local Smoke Test
+
+These items should be handled after the current nginx/server/db smoke test is
+working from Android.
+
+### Dockerize Spring Boot
+
+- Add `server/Dockerfile`.
+- Add `server` service to `docker-compose.yml`.
+- Run Spring Boot inside Docker instead of on the Windows host.
+- Prefer Docker internal service names:
+
+```text
+nginx -> http://server:8080
+server -> db:5432
+```
+
+### Publish Only nginx Externally
+
+Current local development Compose publishes PostgreSQL to the host:
+
+```text
+db: 5432 -> 5432
+```
+
+This is useful for early local testing, but should not be the VPS/default
+security posture.
+
+Target security posture:
+
+```text
+external network -> nginx only
+nginx -> server on internal Docker network
+server -> db on internal Docker network
+server -> voicevox on internal Docker network, when VOICEVOX is enabled
+```
+
+Planned Compose changes:
+
+- Keep `ports` only on `nginx`.
+- Remove `ports` from `db`.
+- Do not add `ports` to `server`.
+- Remove `ports` from `voicevox` when server-side VOICEVOX integration is ready.
+- Use internal Compose service names such as `server`, `db`, and `voicevox`.
+- Keep DB checks available through `docker exec guardian-postgres psql ...`.
+
+### VPS Readiness
+
+- Add HTTPS/TLS handling at nginx.
+- Move production secrets to `.env` on the VPS, never Git.
+- Recheck that API keys are not present in Android source.
+- Add server-side validation and basic rate limiting before exposing wider APIs.
 
 ## Current Practical Summary
 

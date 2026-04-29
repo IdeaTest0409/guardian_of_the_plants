@@ -21,6 +21,11 @@ docker compose ps
 
 `voicevox` is profile-gated and is not needed for this test.
 
+Note: during this first local smoke test, PostgreSQL is published to the host on
+port `5432` for easier inspection. After this path works end to end, the
+security follow-up is to Dockerize Spring Boot and publish only nginx
+externally.
+
 Check nginx itself:
 
 ```powershell
