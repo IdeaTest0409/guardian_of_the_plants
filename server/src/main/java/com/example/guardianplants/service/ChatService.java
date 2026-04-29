@@ -55,14 +55,27 @@ public class ChatService {
 
         Map<String, Object> upstreamBody = buildUpstreamRequest(request, model);
 
+        String apiKey = providerResolver.getApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("AI API key is not configured");
+            emitter.send(SseEmitter.event().data("{\"error\":\"AI API key is not configured\"}"));
+            emitter.complete();
+            return emitter;
+        }
+
         webClientBuilder.build()
             .post()
             .uri(providerResolver.getBaseUrl() + "/chat/completions")
             .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + providerResolver.getApiKey())
+            .header("Authorization", "Bearer " + apiKey)
             .bodyValue(upstreamBody)
             .accept(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
             .retrieve()
+            .onStatus(
+                org.springframework.http.HttpStatus::isError,
+                response -> response.bodyToMono(String.class)
+                    .map(body -> new RuntimeException("Upstream API error: " + response.statusCode() + " - " + body))
+            )
             .bodyToFlux(String.class)
             .subscribe(
                 chunk -> {
