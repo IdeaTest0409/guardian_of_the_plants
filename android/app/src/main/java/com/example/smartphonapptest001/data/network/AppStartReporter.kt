@@ -8,10 +8,13 @@ import com.example.smartphonapptest001.data.logging.AppLogger
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.accept
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
 
 class AppStartReporter(
@@ -30,13 +33,56 @@ class AppStartReporter(
             return
         }
 
+        logger.log(
+            AppLogSeverity.INFO,
+            "AppStartReporter",
+            "Guardian API base URL configured",
+            details = "baseUrl=$normalizedBaseUrl",
+        )
+
+        checkHealth(normalizedBaseUrl)
+        postAppStart(context, normalizedBaseUrl)
+    }
+
+    private suspend fun checkHealth(normalizedBaseUrl: String) {
+        val healthUrl = "$normalizedBaseUrl/health"
         runCatching {
-            client.post("$normalizedBaseUrl/app-start") {
-                timeout {
-                    connectTimeoutMillis = 3_000
-                    requestTimeoutMillis = 5_000
-                    socketTimeoutMillis = 5_000
-                }
+            client.get(healthUrl) {
+                shortTimeout()
+                accept(ContentType.Application.Json)
+            }
+        }.onSuccess { response ->
+            val body = response.bodyAsText()
+            val severity = if (response.status.isSuccess()) AppLogSeverity.INFO else AppLogSeverity.WARN
+            logger.log(
+                severity,
+                "AppStartReporter",
+                "Guardian API health check completed",
+                details = listOf(
+                    "url=$healthUrl",
+                    "status=${response.status.value}",
+                    "body=${body.take(200)}",
+                ).joinToString(separator = "\n"),
+            )
+        }.onFailure { error ->
+            logger.log(
+                AppLogSeverity.WARN,
+                "AppStartReporter",
+                "Guardian API health check failed",
+                details = listOf(
+                    "url=$healthUrl",
+                    "errorType=${error::class.qualifiedName}",
+                    "errorMessage=${error.message.orEmpty()}",
+                ).joinToString(separator = "\n"),
+            )
+        }
+    }
+
+    private suspend fun postAppStart(context: Context, normalizedBaseUrl: String) {
+        val appStartUrl = "$normalizedBaseUrl/app-start"
+        runCatching {
+            client.post(appStartUrl) {
+                shortTimeout()
                 contentType(ContentType.Application.Json)
                 accept(ContentType.Application.Json)
                 setBody(
@@ -51,22 +97,39 @@ class AppStartReporter(
                     ),
                 )
             }
+        }.onSuccess { response ->
+            val body = response.bodyAsText()
+            val severity = if (response.status.isSuccess()) AppLogSeverity.INFO else AppLogSeverity.WARN
+            logger.log(
+                severity,
+                "AppStartReporter",
+                "Server app-start report completed",
+                details = listOf(
+                    "url=$appStartUrl",
+                    "status=${response.status.value}",
+                    "body=${body.take(200)}",
+                ).joinToString(separator = "\n"),
+            )
+        }.onFailure { error ->
+            logger.log(
+                AppLogSeverity.WARN,
+                "AppStartReporter",
+                "Server app-start report failed",
+                details = listOf(
+                    "url=$appStartUrl",
+                    "errorType=${error::class.qualifiedName}",
+                    "errorMessage=${error.message.orEmpty()}",
+                ).joinToString(separator = "\n"),
+            )
         }
-            .onSuccess {
-                logger.log(
-                    AppLogSeverity.INFO,
-                    "AppStartReporter",
-                    "Server app-start report sent",
-                )
-            }
-            .onFailure { error ->
-                logger.log(
-                    AppLogSeverity.WARN,
-                    "AppStartReporter",
-                    "Server app-start report failed",
-                    details = error.message,
-                )
-            }
+    }
+
+    private fun io.ktor.client.request.HttpRequestBuilder.shortTimeout() {
+        timeout {
+            connectTimeoutMillis = 3_000
+            requestTimeoutMillis = 5_000
+            socketTimeoutMillis = 5_000
+        }
     }
 }
 

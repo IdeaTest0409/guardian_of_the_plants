@@ -130,7 +130,17 @@ You can also pass the URL without editing `local.properties`:
 .\gradlew.bat assembleDebug -PguardianApiBaseUrl=http://10.0.2.2/api
 ```
 
-The app sends `POST /api/app-start` once during `MainActivity.onCreate`.
+During `MainActivity.onCreate`, the app logs the configured API base URL, sends
+`GET /api/health`, then sends `POST /api/app-start`.
+
+Expected Android log entries:
+
+```text
+INFO / AppStartReporter: Guardian API base URL configured
+INFO / AppStartReporter: Guardian API health check completed
+INFO / AppStartReporter: Server app-start report completed
+```
+
 Failures are logged locally and do not block the UI.
 
 ## Stop Services
