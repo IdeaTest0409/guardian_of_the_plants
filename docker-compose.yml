@@ -23,6 +23,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-guardian_plants}
       POSTGRES_USER: ${POSTGRES_USER:-guardian_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-guardian_password}
+      AI_BASE_URL: ${AI_BASE_URL:-https://ollama.com/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gemma4:31b-cloud}
     depends_on:
       db:
         condition: service_healthy
