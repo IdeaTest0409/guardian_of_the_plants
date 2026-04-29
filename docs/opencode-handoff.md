@@ -1,6 +1,6 @@
 # opencode handoff: guardian_of_the_plants
 
-Last updated: 2026-04-29
+Last updated: 2026-04-30
 
 ## Current Repository State
 
@@ -78,9 +78,11 @@ guardian_of_the_plants/
     init/
       001_init.sql      PostgreSQL initial schema
   docs/
+    README.md
     android-migration-list.md
     android-build.md
     local-api-smoke-test.md
+    vps-smoke-test.md
     opencode-handoff.md
   nginx/
     default.conf        Local nginx reverse proxy config
@@ -121,11 +123,18 @@ Android app
       -> external AI / Ollama Cloud
 ```
 
-Immediate target:
+Verified milestone:
 
 ```text
 Android app sends one log entry to the server.
 Server stores it in PostgreSQL app_logs.
+```
+
+This has been verified locally and on an Ubuntu VPS. Smartphone app-start rows
+from `Xiaomi/2602BPC18G` reached `app_logs` through:
+
+```text
+Android -> VPS nginx -> server container -> PostgreSQL container
 ```
 
 ## Android App State
@@ -525,6 +534,7 @@ Current behavior:
 - Stores `APP_START` rows into `app_logs`.
 - Returns a simple success response with the inserted ID.
 - Detailed local verification steps are in `docs\local-api-smoke-test.md`.
+- VPS verification steps are in `docs\vps-smoke-test.md`.
 
 ## Android Build Notes
 
@@ -571,15 +581,15 @@ be generated with the local Android SDK path. Do not commit APK outputs,
 
 Do not start with the full VPS architecture. Proceed in small validated steps.
 
-1. Finish local smoke testing with Docker `db` / `server` / `nginx`, and `POST /api/app-start`.
-2. Build and run the Android APK with `guardian.api.baseUrl` configured in `android/local.properties`.
-3. Confirm one Android app start reaches PostgreSQL `app_logs`.
-4. Only after logging works end to end, consider VOICEVOX integration.
-5. Later, move AI key handling and RAG/knowledge management server-side.
+1. Add HTTPS/TLS for the VPS nginx endpoint.
+2. Decide how Android should configure or discover the production API endpoint.
+3. Move AI key handling from Android toward server-side `.env`.
+4. Only after logging works reliably, consider VOICEVOX integration.
+5. Later, move RAG/knowledge management server-side.
 
-## Suggested First Success Criteria
+## First Success Criteria
 
-The first milestone is:
+The first milestone has been met:
 
 ```text
 Android app sends one log entry.
@@ -658,10 +668,7 @@ android/local.properties
 - May need async job flow.
 - Do not block Android UI while generating audio.
 
-## Homework After Local Smoke Test
-
-These items should be handled after the current nginx/server/db smoke test is
-working from Android.
+## Remaining Homework
 
 ### Publish Only nginx Externally
 
@@ -697,4 +704,7 @@ This repository is now ready for normal development as:
 IdeaTest0409/guardian_of_the_plants
 ```
 
-The Android app has been migrated. Docker/nginx/PostgreSQL skeleton exists. The server folder is empty and should be the next major implementation area. The safest next milestone is a minimal Spring Boot API that stores Android logs into PostgreSQL.
+The Android app has been migrated. Docker Compose now runs nginx, the Spring
+Boot server, and PostgreSQL. The verified backend milestone is Android app-start
+logging into PostgreSQL through the VPS. The next practical milestone is HTTPS
+and production-safe secret handling.
