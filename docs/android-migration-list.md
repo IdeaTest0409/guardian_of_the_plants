@@ -1,10 +1,14 @@
 # Android migration list
 
-Source project:
+Source project at migration time:
 
 ```text
 C:\work\test001\smartphonapptest001
 ```
+
+This was only the original Android project location used during migration.
+The active Android project now lives under this repository, so the source
+directory above can be deleted after confirming the migrated project builds.
 
 Target directory:
 
@@ -48,9 +52,10 @@ local.properties
 - Keep server, database, nginx, and Android source in the same repository, but keep their generated outputs separate.
 - After migration, build from `android/` using the Gradle wrapper or Android Studio.
 
-## Suggested Migration Command
+## Historical Migration Command
 
-Use a copy command that excludes generated directories. Review the result before committing.
+This command records how the migration was performed. It is not required for
+normal development after the source project has been copied into `android/`.
 
 ```powershell
 robocopy C:\work\test001\smartphonapptest001 C:\work\guardian_of_the_plants\android /E `

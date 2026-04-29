@@ -134,11 +134,16 @@ Android project path:
 C:\work\guardian_of_the_plants\android
 ```
 
-Original source project:
+Original source project at migration time:
 
 ```text
 C:\work\test001\smartphonapptest001
 ```
+
+This path was only the source used to copy the Android project into this
+repository. The active Android project is `C:\work\guardian_of_the_plants\android`.
+The old `C:\work\test001\smartphonapptest001` directory can be deleted after the
+migrated project is confirmed to build.
 
 Migrated items:
 
