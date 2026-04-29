@@ -79,6 +79,7 @@ guardian_of_the_plants/
       001_init.sql      PostgreSQL initial schema
   docs/
     android-migration-list.md
+    android-build.md
     opencode-handoff.md
   nginx/
     default.conf        Local nginx reverse proxy config
@@ -526,24 +527,44 @@ Recommended behavior:
 
 ## Android Build Notes
 
-`local.properties` is not committed. Recreate it before command-line Android builds.
-
-Known build command from the previous environment:
-
-```powershell
-cd C:\work\guardian_of_the_plants\android
-$env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'
-$env:GRADLE_USER_HOME='C:\work\gradle-home'
-& 'C:\Users\tomok\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\bin\gradle.bat' assembleDebug
-```
-
-If using Android Studio, open:
+Detailed APK build instructions are in:
 
 ```text
-C:\work\guardian_of_the_plants\android
+docs\android-build.md
 ```
 
-Let Android Studio recreate local project metadata and `local.properties`.
+The repository includes the Android Gradle Wrapper:
+
+```text
+android\gradlew
+android\gradlew.bat
+android\gradle\wrapper\gradle-wrapper.jar
+android\gradle\wrapper\gradle-wrapper.properties
+```
+
+Build debug APK from the Android project directory:
+
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+On Windows PowerShell:
+
+```powershell
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Expected debug APK output:
+
+```text
+android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+`local.properties` is not committed. Android Studio can recreate it, or it can
+be generated with the local Android SDK path. Do not commit APK outputs,
+`local.properties`, `.gradle/`, or build directories.
 
 ## Recommended Next Work
 
