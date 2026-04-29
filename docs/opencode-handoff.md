@@ -1,0 +1,647 @@
+# opencode handoff: guardian_of_the_plants
+
+Last updated: 2026-04-29
+
+## Current Repository State
+
+Repository:
+
+```text
+https://github.com/IdeaTest0409/guardian_of_the_plants
+```
+
+Local working directory:
+
+```text
+C:\work\guardian_of_the_plants
+```
+
+Git state before adding this handoff document:
+
+```text
+branch: main
+remote: origin https://github.com/IdeaTest0409/guardian_of_the_plants.git
+base commit: 6ed1004 Initial guardian of the plants project
+status: main was synced with origin/main before this document was added
+```
+
+Important history:
+
+- This project was originally inside a parent Git repository at `C:\work`.
+- It has now been split into its own standalone Git repository at `C:\work\guardian_of_the_plants`.
+- The GitHub repository `IdeaTest0409/guardian_of_the_plants` has been created and pushed.
+- GitHub CLI was installed at `C:\Program Files\GitHub CLI\gh.exe`.
+- GitHub CLI authentication was completed for user `IdeaTest0409`.
+
+## Security Cleanup Already Done
+
+Before the first commit, an Ollama Cloud API key had been found hardcoded in:
+
+```text
+android\app\src\main\java\com\example\smartphonapptest001\data\model\AppSettings.kt
+```
+
+It was changed to an empty default:
+
+```kotlin
+const val DEFAULT_OLLAMA_CLOUD_API_KEY = ""
+```
+
+Do not restore an API key into source code.
+
+The real runtime secrets should stay in:
+
+```text
+.env
+```
+
+The `.env` file is intentionally ignored by Git. The shared template is:
+
+```text
+.env.example
+```
+
+Before future public pushes, check again for secrets:
+
+```powershell
+cd C:\work\guardian_of_the_plants
+git status --ignored --short
+Select-String -Path android\app\src\main\java\com\example\smartphonapptest001\data\model\AppSettings.kt -Pattern 'API_KEY|sk-|Bearer|67615eb9' -CaseSensitive:$false
+```
+
+## Directory Structure
+
+```text
+guardian_of_the_plants/
+  android/              Android app migrated from smartphonapptest001
+  db/
+    init/
+      001_init.sql      PostgreSQL initial schema
+  docs/
+    android-migration-list.md
+    opencode-handoff.md
+  nginx/
+    default.conf        Local nginx reverse proxy config
+  server/               Empty; Spring Boot server should be created here later
+  .env                  Local secrets, ignored by Git
+  .env.example          Shared environment template
+  .gitattributes
+  .gitignore
+  docker-compose.yml
+```
+
+Ignored generated/local paths include:
+
+```text
+.env
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+```
+
+Note: `android/.gradle/` and `android/build/` existed locally during setup, but they are ignored and were not committed.
+
+## Project Goal
+
+Build an Android app for ornamental plant care where a guardian angel or butler character talks about photographed plants, reads responses aloud, and eventually stores logs and conversation history on a VPS-backed server.
+
+Long-term target architecture:
+
+```text
+Android app
+  -> nginx
+    -> Spring Boot server
+      -> PostgreSQL
+      -> VOICEVOX Engine
+      -> external AI / Ollama Cloud
+```
+
+Immediate target:
+
+```text
+Android app sends one log entry to the server.
+Server stores it in PostgreSQL app_logs.
+```
+
+## Android App State
+
+Android project path:
+
+```text
+C:\work\guardian_of_the_plants\android
+```
+
+Original source project:
+
+```text
+C:\work\test001\smartphonapptest001
+```
+
+Migrated items:
+
+```text
+app/
+gradle/
+build.gradle.kts
+settings.gradle.kts
+gradle.properties
+README.md
+.gitattributes
+.gitignore
+```
+
+Not migrated intentionally:
+
+```text
+.git/
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.apk
+```
+
+`local.properties` is not committed because it contains a machine-specific Android SDK path. Recreate it via Android Studio or manually:
+
+```properties
+sdk.dir=C\:\\Users\\tomok\\AppData\\Local\\Android\\Sdk
+```
+
+Known Android features:
+
+- Native Android app with Jetpack Compose.
+- Plant conversation UI.
+- Guardian personalities: `ANGEL` and `BUTLER`.
+- Presentation modes: 2D, 3D, MR camera.
+- AI providers: local LiteRT-LM, LM Studio-compatible cloud, Ollama Cloud.
+- Image input: camera capture, file picker, real-time camera.
+- Android TextToSpeech.
+- Log save/share.
+- Crash recovery logs.
+- Quick prompt buttons.
+- Voice input.
+- Auto small talk.
+- Sansevieria knowledge file used as RAG-like context.
+
+Knowledge file:
+
+```text
+android\app\src\main\assets\knowledge\sansevieria_knowledge.txt
+```
+
+Knowledge repository:
+
+```text
+android\app\src\main\java\com\example\smartphonapptest001\data\knowledge\PlantKnowledgeRepository.kt
+```
+
+## MR / 3D Notes
+
+Realtime camera MR has worked before.
+
+Static image plus SceneView 3D overlay was unstable. Previously attempted approaches:
+
+- Compose `Image` background plus SceneView.
+- Android `ImageView` background plus SceneView.
+- SceneView `ImageNode` for still-image background.
+
+Observed problems:
+
+- Compose/ImageView background could become black behind SceneView.
+- SceneView `ImageNode` triggered native crashes in `libfilament-jni.so`.
+
+Current intended behavior:
+
+- Use MR 3D only for real-time camera mode.
+- For captured still image or uploaded file, fall back to still image plus 2D guardian.
+- Do not reintroduce the `ImageNode` still-image background approach without careful native crash testing.
+
+Important files:
+
+```text
+android\app\src\main\java\com\example\smartphonapptest001\ui\component\GuardianMixedRealityStage.kt
+android\app\src\main\java\com\example\smartphonapptest001\ui\screen\ChatScreen.kt
+```
+
+Current MR initial values:
+
+```text
+X    = -0.34
+Y    = -0.32
+Size = 1.14
+Dist = 0.43
+Yaw  = 0.00
+Tilt = 40.00
+```
+
+3D expression driving is risky:
+
+- Default should remain off.
+- Filament morph target access has caused native crashes before.
+- `Fcl_*` morph target names may need special handling.
+- In MR, only blinking/lip sync should be tested conservatively.
+
+## AI / Ollama Cloud State
+
+Current default provider:
+
+```text
+Provider = OLLAMA_CLOUD
+Model    = gemma4:31b-cloud
+Base URL = https://ollama.com/v1
+```
+
+Currently enabled model:
+
+```text
+gemma4:31b-cloud
+```
+
+Models shown but intentionally not selectable:
+
+```text
+kimi-k2.6:cloud
+qwen3.6:35b
+```
+
+Reason:
+
+- `gemma4:31b-cloud` appeared to work.
+- `kimi-k2.6:cloud` and `qwen3.6:35b` were unresponsive or unstable.
+
+Important settings file:
+
+```text
+android\app\src\main\java\com\example\smartphonapptest001\data\model\AppSettings.kt
+```
+
+DataStore settings repository:
+
+```text
+android\app\src\main\java\com\example\smartphonapptest001\data\SettingsRepository.kt
+```
+
+DataStore name:
+
+```text
+smartphone_app_settings
+```
+
+Key:
+
+```text
+ollama_cloud_api_key
+```
+
+Security direction:
+
+- Do not put AI API keys in Android source.
+- Short term: user/device setting may hold a key locally.
+- Long term: move AI key handling to the Spring Boot server and let Android call only the app's own API.
+
+## TTS / Audio State
+
+Current audio:
+
+- Uses Android internal `TextToSpeech`.
+- No cloud TTS currently.
+- `Speak guardian replies` setting exists.
+- Speech speed setting exists.
+- Default speech speed: `1.2x`.
+
+Voice profile UI was simplified into guardian personality settings:
+
+- Guardian personality.
+- Speak guardian replies.
+- Speech speed.
+
+Future direction:
+
+```text
+Android -> Spring Boot -> VOICEVOX Engine
+```
+
+VOICEVOX should eventually run via Docker. Be careful with CPU load and response latency. A job-based async flow may be better than synchronous generation.
+
+## Auto Small Talk State
+
+Implemented:
+
+- Auto small talk.
+- Default interval: 1 minute.
+- Avoids repeating similar topics.
+- Expands worldbuilding: other plants are protected by guardian angels of friends.
+- Includes plant trivia.
+- Uses Sansevieria knowledge as RAG-like context.
+
+Related files:
+
+```text
+android\app\src\main\assets\knowledge\sansevieria_knowledge.txt
+android\app\src\main\java\com\example\smartphonapptest001\data\knowledge\PlantKnowledgeRepository.kt
+```
+
+## Docker State
+
+Compose file:
+
+```text
+docker-compose.yml
+```
+
+Services:
+
+- `nginx`
+- `db`
+- `voicevox`
+
+Normal local startup:
+
+```powershell
+cd C:\work\guardian_of_the_plants
+docker compose up -d db nginx
+docker compose ps
+curl http://localhost/health
+```
+
+Expected health response:
+
+```text
+nginx ok
+```
+
+VOICEVOX startup:
+
+```powershell
+docker compose --profile voice up -d
+```
+
+### nginx
+
+Config:
+
+```text
+nginx\default.conf
+```
+
+Current `/api/` proxy target:
+
+```nginx
+proxy_pass http://host.docker.internal:8080;
+```
+
+Meaning:
+
+- nginx runs in Docker.
+- Spring Boot is expected to run on the Windows host at port `8080`.
+
+### PostgreSQL
+
+Image:
+
+```text
+postgres:16-alpine
+```
+
+Default DB:
+
+```text
+guardian_plants
+```
+
+Default user:
+
+```text
+guardian_user
+```
+
+Default password:
+
+```text
+guardian_password
+```
+
+Volume:
+
+```text
+postgres_data:/var/lib/postgresql/data
+```
+
+Initial SQL:
+
+```text
+db\init\001_init.sql
+```
+
+## Database Schema
+
+Initial schema includes two tables.
+
+### app_logs
+
+Minimal table for Android-to-server logging.
+
+Main columns:
+
+```text
+id
+device_id
+app_version
+severity
+category
+message
+details JSONB
+occurred_at
+received_at
+```
+
+Use this first.
+
+### chat_histories
+
+Future table for conversation history.
+
+Main columns:
+
+```text
+id
+device_id
+conversation_id
+role
+content
+metadata JSONB
+created_at
+```
+
+Do not prioritize this until app log sending works.
+
+## Server State
+
+Path:
+
+```text
+C:\work\guardian_of_the_plants\server
+```
+
+Current state:
+
+```text
+Empty. Spring Boot project has not been created yet.
+```
+
+Recommended first server APIs:
+
+```text
+GET  /api/health
+POST /api/logs
+```
+
+Example log request body:
+
+```json
+{
+  "deviceId": "android-test",
+  "appVersion": "1.0.0",
+  "severity": "INFO",
+  "category": "ChatViewModel",
+  "message": "test log",
+  "details": {}
+}
+```
+
+Recommended behavior:
+
+- Validate required fields minimally.
+- Store into `app_logs`.
+- Return a simple success response with the inserted ID.
+
+## Android Build Notes
+
+`local.properties` is not committed. Recreate it before command-line Android builds.
+
+Known build command from the previous environment:
+
+```powershell
+cd C:\work\guardian_of_the_plants\android
+$env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'
+$env:GRADLE_USER_HOME='C:\work\gradle-home'
+& 'C:\Users\tomok\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13\bin\gradle.bat' assembleDebug
+```
+
+If using Android Studio, open:
+
+```text
+C:\work\guardian_of_the_plants\android
+```
+
+Let Android Studio recreate local project metadata and `local.properties`.
+
+## Recommended Next Work
+
+Do not start with the full VPS architecture. Proceed in small validated steps.
+
+1. Confirm Android project builds from the new location.
+2. Start local Docker DB/nginx.
+3. Create minimal Spring Boot server in `server/`.
+4. Implement `GET /api/health`.
+5. Implement `POST /api/logs`.
+6. Verify inserts into PostgreSQL `app_logs`.
+7. Add Android server-side log sender that fails silently and does not break app behavior.
+8. Send one log from Android and confirm it appears in DB.
+9. Only after logging works, consider VOICEVOX integration.
+10. Later, move AI key handling and RAG/knowledge management server-side.
+
+## Suggested First Success Criteria
+
+The first milestone is:
+
+```text
+Android app sends one log entry.
+Spring Boot receives it.
+PostgreSQL app_logs stores it.
+The Android app still works even if the server is unavailable.
+```
+
+## Git Commands For opencode
+
+Clone:
+
+```powershell
+git clone https://github.com/IdeaTest0409/guardian_of_the_plants.git
+cd guardian_of_the_plants
+```
+
+Check state:
+
+```powershell
+git status --short --branch
+git remote -v
+git log --oneline -5
+```
+
+Push later changes:
+
+```powershell
+git add <files>
+git commit -m "Describe change"
+git push
+```
+
+GitHub CLI location on the current Windows machine:
+
+```text
+C:\Program Files\GitHub CLI\gh.exe
+```
+
+Example:
+
+```powershell
+& 'C:\Program Files\GitHub CLI\gh.exe' auth status
+```
+
+## Main Risks
+
+### Secrets
+
+- `.env` may contain real secrets.
+- Never commit `.env`.
+- Never put AI API keys back into Android source.
+- Check `AppSettings.kt` before publishing changes.
+
+### Android MR / Filament
+
+- Avoid still-image SceneView MR experiments unless specifically testing native crash risk.
+- Do not reintroduce SceneView `ImageNode` for static background without careful validation.
+- Keep 3D expression/morph target features conservative.
+
+### Generated Files
+
+Do not commit:
+
+```text
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+```
+
+### VOICEVOX
+
+- CPU-heavy.
+- May need async job flow.
+- Do not block Android UI while generating audio.
+
+## Current Practical Summary
+
+This repository is now ready for normal development as:
+
+```text
+IdeaTest0409/guardian_of_the_plants
+```
+
+The Android app has been migrated. Docker/nginx/PostgreSQL skeleton exists. The server folder is empty and should be the next major implementation area. The safest next milestone is a minimal Spring Boot API that stores Android logs into PostgreSQL.
