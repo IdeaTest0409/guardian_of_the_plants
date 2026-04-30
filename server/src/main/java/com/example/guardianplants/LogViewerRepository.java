@@ -42,4 +42,33 @@ public class LogViewerRepository {
             limit
         );
     }
+
+    public List<Map<String, Object>> getChatLogsSince(String sinceTimestamp) {
+        return jdbcTemplate.queryForList(
+            """
+            SELECT created_at, device_id, conversation_id, role,
+                   left(content, 500) as content_preview,
+                   metadata->>'status' as status,
+                   metadata->>'model' as model
+            FROM chat_histories
+            WHERE created_at >= ?
+            ORDER BY created_at ASC
+            """,
+            sinceTimestamp
+        );
+    }
+
+    public List<Map<String, Object>> getAppLogsSince(String sinceTimestamp) {
+        return jdbcTemplate.queryForList(
+            """
+            SELECT received_at, device_id, app_version, severity,
+                   category, left(message, 500) as message_preview,
+                   details
+            FROM app_logs
+            WHERE received_at >= ?
+            ORDER BY received_at ASC
+            """,
+            sinceTimestamp
+        );
+    }
 }

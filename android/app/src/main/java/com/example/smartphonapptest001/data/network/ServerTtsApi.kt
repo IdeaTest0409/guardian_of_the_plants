@@ -24,21 +24,28 @@ class ServerTtsApi(
             return null
         }
 
+        val fullUrl = "$normalizedUrl/tts/synthesize"
+
         return try {
             val jsonBody = """{"text":"${escapeJson(text)}","speaker":$speakerId}"""
             val mediaType = "application/json; charset=utf-8".toMediaType()
             val requestBody = jsonBody.toRequestBody(mediaType)
             val request = Request.Builder()
-                .url("$normalizedUrl/tts/synthesize")
+                .url(fullUrl)
                 .post(requestBody)
                 .build()
+
+            logger.log(
+                AppLogSeverity.INFO, TAG, "TTS request started",
+                details = "url=$fullUrl, text=${text.take(50)}, speaker=$speakerId",
+            )
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string().orEmpty()
                     logger.log(
                         AppLogSeverity.ERROR, TAG, "TTS synthesis failed",
-                        details = "status=${response.code}, body=$errorBody",
+                        details = "url=$fullUrl, status=${response.code}, body=$errorBody",
                     )
                     return null
                 }
@@ -54,7 +61,12 @@ class ServerTtsApi(
         } catch (e: Exception) {
             logger.log(
                 AppLogSeverity.ERROR, TAG, "TTS synthesis exception",
-                details = e.message.orEmpty(),
+                details = buildString {
+                    appendLine("url=$fullUrl")
+                    appendLine("type=${e::class.java.simpleName}")
+                    appendLine("message=${e.message.orEmpty()}")
+                    appendLine("stackTrace=${android.util.Log.getStackTraceString(e).take(500)}")
+                },
             )
             null
         }

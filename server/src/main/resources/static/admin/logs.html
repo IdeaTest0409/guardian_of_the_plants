@@ -17,10 +17,15 @@
         .section { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .section-header h2 { font-size: 1.1rem; }
+        .btn-group { display: flex; gap: 6px; align-items: center; }
         .refresh-btn { background: #4a90d9; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         .refresh-btn:hover { background: #357abd; }
         .refresh-btn:disabled { background: #aaa; cursor: wait; }
+        .download-btn { background: #16a34a; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .download-btn:hover { background: #15803d; }
+        .download-btn:disabled { background: #aaa; cursor: wait; }
         .auto-refresh { font-size: 0.75rem; color: #888; margin-left: 8px; }
+        .hours-select { font-size: 0.8rem; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th { background: #f0f0f0; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; white-space: nowrap; }
         td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
@@ -39,6 +44,7 @@
         @media (max-width: 600px) {
             th, td { font-size: 0.75rem; padding: 6px 4px; }
             .hide-mobile { display: none; }
+            .section-header { flex-direction: column; align-items: flex-start; gap: 8px; }
         }
     </style>
 </head>
@@ -52,8 +58,14 @@
     <div class="section">
         <div class="section-header">
             <h2>Chat History <span class="count-label" id="chat-count"></span></h2>
-            <div>
+            <div class="btn-group">
                 <button class="refresh-btn" onclick="loadChatLogs()">Refresh</button>
+                <button class="download-btn" onclick="downloadLogs()">Download</button>
+                <select class="hours-select" id="chat-hours">
+                    <option value="1">1h</option>
+                    <option value="6">6h</option>
+                    <option value="24">24h</option>
+                </select>
                 <span class="auto-refresh">Auto-refresh: 30s</span>
             </div>
         </div>
@@ -79,8 +91,14 @@
     <div class="section">
         <div class="section-header">
             <h2>App Logs <span class="count-label" id="app-count"></span></h2>
-            <div>
+            <div class="btn-group">
                 <button class="refresh-btn" onclick="loadAppLogs()">Refresh</button>
+                <button class="download-btn" onclick="downloadLogs()">Download</button>
+                <select class="hours-select" id="app-hours">
+                    <option value="1">1h</option>
+                    <option value="6">6h</option>
+                    <option value="24">24h</option>
+                </select>
                 <span class="auto-refresh">Auto-refresh: 30s</span>
             </div>
         </div>
@@ -199,6 +217,35 @@
                     document.getElementById('app-tbody').innerHTML = '<tr><td colspan="5" class="empty-msg">Error: ' + esc(e.message) + '</td></tr>';
                 })
                 .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; } });
+        }
+
+        function downloadLogs() {
+            const btn = event?.target;
+            if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
+            const hours = Math.min(
+                parseInt(document.getElementById('chat-hours')?.value || '1'),
+                parseInt(document.getElementById('app-hours')?.value || '1')
+            );
+            fetch('/api/logs/download?hours=' + hours + '&type=all')
+                .then(r => {
+                    if (!r.ok) throw new Error('Download failed');
+                    return r.text();
+                })
+                .then(text => {
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'guardian-logs.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(e => {
+                    alert('Download failed: ' + e.message);
+                })
+                .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Download'; } });
         }
 
         function loadAll() {
