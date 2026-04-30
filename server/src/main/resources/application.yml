@@ -16,3 +16,7 @@ ai:
     base-url: ${AI_BASE_URL:https://ollama.com/v1}
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:gemma4:31b-cloud}
+
+voicevox:
+  enabled: ${VOICEVOX_ENABLED:false}
+  base-url: ${VOICEVOX_BASE_URL:http://voicevox:50021}

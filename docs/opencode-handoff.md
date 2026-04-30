@@ -1,6 +1,6 @@
 # opencode handoff: guardian_of_the_plants
 
-Last updated: 2026-04-30
+Last updated: 2026-04-30 (VoiceVOX TTS integration)
 
 ## Current Repository State
 
@@ -413,11 +413,13 @@ Expected health response:
 nginx ok
 ```
 
-VOICEVOX startup:
+VoiceVOX startup (now default — no profile needed):
 
 ```powershell
-docker compose --profile voice up -d
+docker compose up -d
 ```
+
+VoiceVOX is controlled via `VOICEVOX_ENABLED` in `.env`. Set to `false` to disable TTS and save CPU resources.
 
 ### nginx
 
@@ -534,11 +536,14 @@ Current state:
 Spring Boot project exists.
 ```
 
-Current first server APIs:
+Current server APIs:
 
 ```text
 GET  /api/health
 POST /api/app-start
+POST /api/chat       (SSE proxy to AI provider)
+POST /api/tts/synthesize  (VoiceVOX TTS → WAV)
+GET  /api/tts/speakers    (List available VoiceVOX speakers)
 ```
 
 Example app-start request body:
@@ -608,8 +613,9 @@ Do not start with the full VPS architecture. Proceed in small validated steps.
 3. Verify `chat_histories` rows are inserted in PostgreSQL during/after streaming.
 4. Add HTTPS/TLS for the VPS nginx endpoint.
 5. Decide how Android should configure or discover the production API endpoint.
-6. Only after chat works reliably, consider VOICEVOX integration.
-7. Later, move RAG/knowledge management server-side.
+6. ~~VOICEVOX integration~~ → Done (server-side TTS endpoints available).
+7. Next: Android integration with server-side TTS (replace Android TextToSpeech with VoiceVOX WAV playback for SERVER provider).
+8. Later, move RAG/knowledge management server-side.
 
 ## Completed Milestones
 
@@ -620,6 +626,19 @@ Android app sends one log entry.
 Spring Boot receive it.
 PostgreSQL app_logs stores it.
 The Android app still works even if the server is unavailable.
+```
+
+### Milestone 3: Server-side VoiceVOX TTS (2026-04-30)
+
+> Implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.
+
+```text
+Server exposes POST /api/tts/synthesize for VoiceVOX text-to-speech.
+POST /api/tts/synthesize accepts { text, speaker } and returns WAV audio.
+GET /api/tts/speakers lists available VoiceVOX speakers.
+VoiceVOX Engine runs as a Docker container (default start, no profile needed).
+VOICEVOX_ENABLED in .env controls TTS availability.
+nginx /api/ proxy covers both /api/chat and /api/tts.
 ```
 
 ### Milestone 2: Server-Side Chat API (2026-04-30)
@@ -742,6 +761,8 @@ IdeaTest0409/guardian_of_the_plants
 ```
 
 The Android app has been migrated. Docker Compose now runs nginx, the Spring
-Boot server, and PostgreSQL. The verified backend milestone is Android app-start
-logging into PostgreSQL through the VPS. The next practical milestone is HTTPS
-and production-safe secret handling.
+Boot server, PostgreSQL, and VoiceVOX Engine. The verified backend milestones are:
+Android app-start logging into PostgreSQL, server-side chat API with SSE proxy,
+and server-side VoiceVOX TTS synthesis. The next practical milestone is Android
+integration with server-side TTS, followed by HTTPS and production-safe secret
+handling.

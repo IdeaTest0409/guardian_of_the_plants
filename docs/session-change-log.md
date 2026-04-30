@@ -6,6 +6,88 @@ This document summarizes all changes made during the development session.
 
 ---
 
+## 2. Server-side VoiceVOX TTS Integration (2026-04-30)
+
+> **Note:** This feature was implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.
+
+### New Server Files
+
+| File | Purpose |
+|------|---------|
+| `server/.../config/VoiceVoxConfig.java` | `@ConfigurationProperties` for VoiceVOX settings (enabled, base-url) |
+| `server/.../dto/TtsRequest.java` | TTS request DTO: `text` (String), `speaker` (int) |
+| `server/.../service/TtsService.java` | VoiceVOX communication: `/audio_query` → `/synthesis` → WAV return |
+| `server/.../controller/TtsController.java` | `POST /api/tts/synthesize`, `GET /api/tts/speakers` endpoints |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `docker-compose.yml` | Removed `profiles: [voice]` from voicevox service (always starts); added `VOICEVOX_ENABLED` and `VOICEVOX_BASE_URL` env var mapping; added `voicevox_data` volume |
+| `.env.example` | Added `VOICEVOX_ENABLED=true` |
+| `server/src/main/resources/application.yml` | Added `voicevox.enabled` and `voicevox.base-url` properties |
+| `server/.../service/ChatService.java` | Fixed compilation errors: `HttpStatus::isError` → `status -> status.isError()`; wrapped `emitter.send()` in try-catch for `IOException` |
+
+### New Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/tts/synthesize` | Synthesize speech via VoiceVOX. Returns WAV audio. |
+| `GET` | `/api/tts/speakers` | List available VoiceVOX speakers (proxied from VoiceVOX engine). |
+
+### Request/Response
+
+**POST /api/tts/synthesize**
+
+Request body:
+```json
+{ "text": "こんにちは", "speaker": 2 }
+```
+
+Response:
+- Success: `200 OK`, `Content-Type: audio/wav`, WAV binary
+- Disabled: `400 Bad Request`, `{"error":"TTS is disabled"}`
+- VoiceVOX error: `502 Bad Gateway`, `{"error":"VoiceVOX unavailable: ..."}`
+
+**GET /api/tts/speakers**
+
+Response:
+- Success: `200 OK`, JSON array of speaker objects (name, styles, ids, etc.)
+- Disabled: `400 Bad Request`, `{"error":"TTS is disabled"}`
+
+### VoiceVOX Communication Flow
+
+```
+1. POST {voicevox_url}/audio_query?text={text}&speaker={speaker}
+   → Returns audio query JSON (phoneme timing, pitch, etc.)
+2. POST {voicevox_url}/synthesis?speaker={speaker}
+   Content-Type: application/json
+   Body: audio query JSON from step 1
+   → Returns WAV binary
+```
+
+### Architecture
+
+```
+Android → nginx → Spring Boot server → VoiceVOX Engine (Docker)
+                                         ↓
+                                    WAV audio
+                                         ↓
+                                    Android playback
+```
+
+### TTS Enable/Disable Control
+
+- `VOICEVOX_ENABLED=true` → TTS endpoints active
+- `VOICEVOX_ENABLED=false` → Returns error response (saves CPU resources)
+
+### Verification
+
+- `GET /api/tts/speakers` → 33 speakers returned (四国めたん, ずんだもん, 春日部つむぎ, etc.)
+- `POST /api/tts/synthesize` with `speaker=2` → 45KB WAV file generated with valid RIFF header
+
+---
+
 ## 1. Server-Side Chat API with SSE Proxy (Commit: 871b059)
 
 ### New Server Files

@@ -58,7 +58,11 @@ public class ChatService {
         String apiKey = providerResolver.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             log.error("AI API key is not configured");
-            emitter.send(SseEmitter.event().data("{\"error\":\"AI API key is not configured\"}"));
+            try {
+                emitter.send(SseEmitter.event().data("{\"error\":\"AI API key is not configured\"}"));
+            } catch (IOException e) {
+                log.warn("Failed to send error response", e);
+            }
             emitter.complete();
             return emitter;
         }
@@ -72,7 +76,7 @@ public class ChatService {
             .accept(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
             .retrieve()
             .onStatus(
-                org.springframework.http.HttpStatus::isError,
+                status -> status.isError(),
                 response -> response.bodyToMono(String.class)
                     .map(body -> new RuntimeException("Upstream API error: " + response.statusCode() + " - " + body))
             )
