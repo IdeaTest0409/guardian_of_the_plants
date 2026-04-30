@@ -13,6 +13,11 @@ import com.example.smartphonapptest001.data.network.KtorOpenAiCompatibleChatApi
 import com.example.smartphonapptest001.data.network.ServerChatApi
 import com.example.smartphonapptest001.data.network.ServerMessage
 import com.example.smartphonapptest001.data.network.toOpenAiRequest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
@@ -252,7 +257,26 @@ private fun List<ChatMessage>.toServerMessages(): List<ServerMessage> =
             ChatRole.USER -> "user"
             ChatRole.ASSISTANT -> "assistant"
         }
-        ServerMessage(role = role, content = msg.content)
+        val imageAttachments = msg.attachments.filter { it.kind == com.example.smartphonapptest001.data.model.AttachmentKind.IMAGE && !it.dataUrl.isNullOrBlank() }
+        if (imageAttachments.isEmpty() && msg.content.isNotBlank()) {
+            ServerMessage.text(role, msg.content)
+        } else {
+            val contentArray = mutableListOf<kotlinx.serialization.json.JsonElement>()
+            if (msg.content.isNotBlank()) {
+                contentArray.add(JsonPrimitive(msg.content))
+            }
+            for (attachment in imageAttachments) {
+                contentArray.add(
+                    buildJsonObject {
+                        put("type", "image_url")
+                        put("image_url", buildJsonObject {
+                            put("url", attachment.dataUrl!!)
+                        })
+                    }
+                )
+            }
+            ServerMessage(role = role, content = JsonArray(contentArray))
+        }
     }
 
 private fun List<ChatMessage>.findConversationId(): String {

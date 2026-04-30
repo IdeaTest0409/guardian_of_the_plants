@@ -3,6 +3,7 @@ package com.example.smartphonapptest001.data.network
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 @Serializable
 data class ServerChatRequest(
@@ -21,5 +22,10 @@ data class ServerMessage(
     @SerialName("role")
     val role: String,
     @SerialName("content")
-    val content: String,
-)
+    val content: JsonElement,
+) {
+    companion object {
+        fun text(role: String, text: String): ServerMessage =
+            ServerMessage(role = role, content = JsonPrimitive(text))
+    }
+}

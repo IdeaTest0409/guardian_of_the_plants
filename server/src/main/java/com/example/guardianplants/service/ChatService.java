@@ -49,7 +49,7 @@ public class ChatService {
             var lastUser = request.messages().get(request.messages().size() - 1);
             if ("user".equalsIgnoreCase(lastUser.role())) {
                 String metadata = chatHistoryRepository.buildMetadata("server", model, "ok");
-                chatHistoryRepository.insert(deviceId, conversationId, "user", lastUser.content(), metadata);
+                chatHistoryRepository.insert(deviceId, conversationId, "user", lastUser.contentAsString(), metadata);
             }
         }
 
