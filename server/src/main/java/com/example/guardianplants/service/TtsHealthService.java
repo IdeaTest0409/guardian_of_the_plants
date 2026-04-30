@@ -31,7 +31,7 @@ public class TtsHealthService {
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
-            boolean healthy = result != null && result.contains("0.");
+            boolean healthy = result != null && !result.isBlank();
             log.info("VoiceVOX health check: {} (version={})", healthy ? "ok" : "failed", result);
             return healthy;
         } catch (Exception e) {
