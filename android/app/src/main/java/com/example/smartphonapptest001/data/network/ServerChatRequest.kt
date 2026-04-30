@@ -2,6 +2,7 @@ package com.example.smartphonapptest001.data.network
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ServerChatRequest(
@@ -12,7 +13,7 @@ data class ServerChatRequest(
     @SerialName("messages")
     val messages: List<ServerMessage>,
     @SerialName("options")
-    val options: Map<String, Any>? = null,
+    val options: Map<String, JsonElement>? = null,
 )
 
 @Serializable

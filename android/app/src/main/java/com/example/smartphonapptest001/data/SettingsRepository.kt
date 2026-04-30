@@ -20,6 +20,7 @@ import com.example.smartphonapptest001.data.model.LocalExecutionBackend
 import com.example.smartphonapptest001.data.model.ProviderType
 import com.example.smartphonapptest001.data.model.PlantSpecies
 import com.example.smartphonapptest001.data.model.TtsVoiceProfile
+import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -78,6 +79,8 @@ class DataStoreSettingsRepository(
                 ttsSpeechRateMultiplier = prefs[Keys.ttsSpeechRateMultiplier]?.toDoubleOrNull()
                     ?.coerceIn(1.0, 2.0)
                     ?: AppSettings.DEFAULT_TTS_SPEECH_RATE_MULTIPLIER,
+                voiceVoxEnabled = prefs[Keys.voiceVoxEnabled] ?: AppSettings.DEFAULT_VOICEVOX_ENABLED,
+                voiceVoxSpeaker = parseVoiceVoxSpeaker(prefs[Keys.voiceVoxSpeaker]),
                 autoSmallTalkInterval = AutoSmallTalkInterval.fromName(prefs[Keys.autoSmallTalkInterval]),
                 maxOutputTokens = prefs[Keys.maxOutputTokens]?.toIntOrNull() ?: AppSettings.DEFAULT_MAX_OUTPUT_TOKENS,
                 topK = prefs[Keys.topK]?.toIntOrNull() ?: AppSettings.DEFAULT_TOP_K,
@@ -120,6 +123,8 @@ class DataStoreSettingsRepository(
             prefs[Keys.speakAssistantReplies] = settings.speakAssistantReplies
             prefs[Keys.ttsVoiceProfile] = settings.ttsVoiceProfile.name
             prefs[Keys.ttsSpeechRateMultiplier] = settings.ttsSpeechRateMultiplier.coerceIn(1.0, 2.0).toString()
+            prefs[Keys.voiceVoxEnabled] = settings.voiceVoxEnabled
+            prefs[Keys.voiceVoxSpeaker] = settings.voiceVoxSpeaker.name
             prefs[Keys.autoSmallTalkInterval] = settings.autoSmallTalkInterval.name
             prefs[Keys.maxOutputTokens] = settings.maxOutputTokens.toString()
             prefs[Keys.topK] = settings.topK.toString()
@@ -171,6 +176,8 @@ class DataStoreSettingsRepository(
         val speakAssistantReplies = booleanPreferencesKey("speak_assistant_replies")
         val ttsVoiceProfile = stringPreferencesKey("tts_voice_profile")
         val ttsSpeechRateMultiplier = stringPreferencesKey("tts_speech_rate_multiplier")
+        val voiceVoxEnabled = booleanPreferencesKey("voicevox_enabled")
+        val voiceVoxSpeaker = stringPreferencesKey("voicevox_speaker")
         val autoSmallTalkInterval = stringPreferencesKey("auto_small_talk_interval")
         val maxOutputTokens = stringPreferencesKey("max_output_tokens")
         val topK = stringPreferencesKey("top_k")
@@ -217,6 +224,11 @@ class DataStoreSettingsRepository(
     private fun parseTtsVoiceProfile(rawValue: String?): TtsVoiceProfile {
         return runCatching { TtsVoiceProfile.valueOf(rawValue ?: TtsVoiceProfile.default().name) }
             .getOrDefault(TtsVoiceProfile.default())
+    }
+
+    private fun parseVoiceVoxSpeaker(rawValue: String?): VoiceVoxSpeaker {
+        return runCatching { VoiceVoxSpeaker.valueOf(rawValue ?: VoiceVoxSpeaker.default().name) }
+            .getOrDefault(VoiceVoxSpeaker.default())
     }
 
 }

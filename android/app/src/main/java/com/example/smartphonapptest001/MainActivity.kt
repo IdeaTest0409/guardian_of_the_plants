@@ -27,6 +27,7 @@ import com.example.smartphonapptest001.data.logging.toDisplayText
 import com.example.smartphonapptest001.data.logging.toStructuredLogDetails
 import com.example.smartphonapptest001.data.model.AppSettings
 import com.example.smartphonapptest001.data.model.AvatarPresentationMode
+import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
 import com.example.smartphonapptest001.ui.SmartphoneChatApp
 import com.example.smartphonapptest001.ui.theme.SmartphoneAppTheme
 import com.example.smartphonapptest001.viewmodel.ChatViewModel
@@ -169,6 +170,8 @@ class MainActivity : ComponentActivity() {
                             speakAssistantReplies = settingsState.speakAssistantReplies,
                             ttsVoiceProfile = settingsState.ttsVoiceProfile,
                             ttsSpeechRateMultiplier = settingsState.ttsSpeechRateMultiplier,
+                            voiceVoxEnabled = settingsState.voiceVoxEnabled,
+                            voiceVoxSpeaker = settingsState.voiceVoxSpeaker,
                             autoSmallTalkInterval = settingsState.autoSmallTalkInterval,
                             maxOutputTokens = settingsState.maxOutputTokens,
                             topK = settingsState.topK,
@@ -229,6 +232,8 @@ class MainActivity : ComponentActivity() {
                     onSpeakAssistantRepliesChange = settingsViewModel::onSpeakAssistantRepliesChange,
                     onTtsVoiceProfileChange = settingsViewModel::onTtsVoiceProfileChange,
                     onTtsSpeechRateMultiplierChange = settingsViewModel::onTtsSpeechRateMultiplierChange,
+                    onVoiceVoxEnabledChange = settingsViewModel::onVoiceVoxEnabledChange,
+                    onVoiceVoxSpeakerChange = settingsViewModel::onVoiceVoxSpeakerChange,
                     onAutoSmallTalkIntervalChange = settingsViewModel::onAutoSmallTalkIntervalChange,
                     onMaxOutputTokensChange = settingsViewModel::onMaxOutputTokensChange,
                     onTopKChange = settingsViewModel::onTopKChange,

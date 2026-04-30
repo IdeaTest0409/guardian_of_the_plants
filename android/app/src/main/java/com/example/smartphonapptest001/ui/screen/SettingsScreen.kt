@@ -60,6 +60,8 @@ import com.example.smartphonapptest001.data.model.LocalModelPreset
 import com.example.smartphonapptest001.data.model.PlantImageSelectionMode
 import com.example.smartphonapptest001.data.model.PlantSpecies
 import com.example.smartphonapptest001.data.model.ProviderType
+import com.example.smartphonapptest001.data.model.TtsVoiceProfile
+import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
 import com.example.smartphonapptest001.viewmodel.SettingsUiState
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -95,6 +97,8 @@ fun SettingsScreen(
     onSpeakAssistantRepliesChange: (Boolean) -> Unit,
     onTtsVoiceProfileChange: (com.example.smartphonapptest001.data.model.TtsVoiceProfile) -> Unit,
     onTtsSpeechRateMultiplierChange: (Double) -> Unit,
+    onVoiceVoxEnabledChange: (Boolean) -> Unit,
+    onVoiceVoxSpeakerChange: (VoiceVoxSpeaker) -> Unit,
     onAutoSmallTalkIntervalChange: (AutoSmallTalkInterval) -> Unit,
     onMaxOutputTokensChange: (Int) -> Unit,
     onTopKChange: (Int) -> Unit,
@@ -424,6 +428,48 @@ fun SettingsScreen(
             steps = 4,
             modifier = Modifier.fillMaxWidth(),
         )
+        if (state.providerType == ProviderType.SERVER) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Use VoiceVox TTS",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = "Use server VoiceVox instead of device TTS for speech.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = state.voiceVoxEnabled,
+                    onCheckedChange = onVoiceVoxEnabledChange,
+                )
+            }
+            if (state.voiceVoxEnabled) {
+                var voiceVoxMenuExpanded by remember { mutableStateOf(false) }
+                SelectionField(
+                    label = "VoiceVox speaker",
+                    value = state.voiceVoxSpeaker.label,
+                    expanded = voiceVoxMenuExpanded,
+                    onExpandedChange = { voiceVoxMenuExpanded = it },
+                    onDismiss = { voiceVoxMenuExpanded = false },
+                ) {
+                    VoiceVoxSpeaker.entries.forEach { speaker ->
+                        DropdownMenuItem(
+                            text = { Text(speaker.label) },
+                            onClick = {
+                                onVoiceVoxSpeakerChange(speaker)
+                                voiceVoxMenuExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
         SelectionField(
             label = "Auto small talk",
             value = state.autoSmallTalkInterval.label,

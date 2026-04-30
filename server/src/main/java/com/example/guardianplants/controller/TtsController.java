@@ -1,6 +1,7 @@
 package com.example.guardianplants.controller;
 
 import com.example.guardianplants.dto.TtsRequest;
+import com.example.guardianplants.service.TtsHealthService;
 import com.example.guardianplants.service.TtsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +23,11 @@ public class TtsController {
     private static final Logger log = LoggerFactory.getLogger(TtsController.class);
 
     private final TtsService ttsService;
+    private final TtsHealthService ttsHealthService;
 
-    public TtsController(TtsService ttsService) {
+    public TtsController(TtsService ttsService, TtsHealthService ttsHealthService) {
         this.ttsService = ttsService;
+        this.ttsHealthService = ttsHealthService;
     }
 
     @PostMapping(value = "/synthesize", produces = "audio/wav")
@@ -65,5 +68,16 @@ public class TtsController {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", "VoiceVOX unavailable: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> health() {
+        boolean voiceVoxHealthy = ttsHealthService.checkVoiceVoxHealth();
+        Map<String, Object> result = Map.of(
+            "enabled", true,
+            "voicevox", voiceVoxHealthy ? "ok" : "unreachable",
+            "voicevoxHealthy", voiceVoxHealthy
+        );
+        return ResponseEntity.ok(result);
     }
 }

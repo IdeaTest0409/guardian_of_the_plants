@@ -32,6 +32,8 @@ data class AppSettings(
     val speakAssistantReplies: Boolean = DEFAULT_SPEAK_ASSISTANT_REPLIES,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
     val ttsSpeechRateMultiplier: Double = DEFAULT_TTS_SPEECH_RATE_MULTIPLIER,
+    val voiceVoxEnabled: Boolean = DEFAULT_VOICEVOX_ENABLED,
+    val voiceVoxSpeaker: VoiceVoxSpeaker = VoiceVoxSpeaker.default(),
     val autoSmallTalkInterval: AutoSmallTalkInterval = AutoSmallTalkInterval.default(),
     val maxOutputTokens: Int = DEFAULT_MAX_OUTPUT_TOKENS,
     val topK: Int = DEFAULT_TOP_K,
@@ -150,6 +152,7 @@ data class AppSettings(
         const val DEFAULT_THINKING_ENABLED = false
         const val DEFAULT_SPEAK_ASSISTANT_REPLIES = true
         const val DEFAULT_TTS_SPEECH_RATE_MULTIPLIER = 1.2
+        const val DEFAULT_VOICEVOX_ENABLED = false
         const val DEFAULT_AVATAR_EXPRESSION_ENABLED = false
         const val DEFAULT_CHAT_STATUS_BAR_VISIBLE = false
         const val DEFAULT_MR_AVATAR_MOTION_ENABLED = false

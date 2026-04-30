@@ -23,6 +23,7 @@ import com.example.smartphonapptest001.data.model.ProviderType
 import com.example.smartphonapptest001.data.model.Attachment
 import com.example.smartphonapptest001.data.model.AutoSmallTalkInterval
 import com.example.smartphonapptest001.data.model.TtsVoiceProfile
+import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +62,8 @@ data class SettingsUiState(
     val speakAssistantReplies: Boolean = false,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
     val ttsSpeechRateMultiplier: Double = AppSettings.DEFAULT_TTS_SPEECH_RATE_MULTIPLIER,
+    val voiceVoxEnabled: Boolean = AppSettings.DEFAULT_VOICEVOX_ENABLED,
+    val voiceVoxSpeaker: VoiceVoxSpeaker = VoiceVoxSpeaker.default(),
     val autoSmallTalkInterval: AutoSmallTalkInterval = AutoSmallTalkInterval.default(),
     val maxOutputTokens: Int = AppSettings.DEFAULT_MAX_OUTPUT_TOKENS,
     val topK: Int = AppSettings.DEFAULT_TOP_K,
@@ -157,6 +160,8 @@ class SettingsViewModel(
                         speakAssistantReplies = settings.speakAssistantReplies,
                         ttsVoiceProfile = settings.ttsVoiceProfile,
                         ttsSpeechRateMultiplier = settings.ttsSpeechRateMultiplier,
+                        voiceVoxEnabled = settings.voiceVoxEnabled,
+                        voiceVoxSpeaker = settings.voiceVoxSpeaker,
                         autoSmallTalkInterval = settings.autoSmallTalkInterval,
                         maxOutputTokens = settings.maxOutputTokens,
                         topK = settings.topK,
@@ -337,6 +342,14 @@ class SettingsViewModel(
 
     fun onTtsSpeechRateMultiplierChange(value: Double) {
         _uiState.update { it.copy(ttsSpeechRateMultiplier = value.roundToSpeechRateStep()) }
+    }
+
+    fun onVoiceVoxEnabledChange(value: Boolean) {
+        _uiState.update { it.copy(voiceVoxEnabled = value) }
+    }
+
+    fun onVoiceVoxSpeakerChange(value: VoiceVoxSpeaker) {
+        _uiState.update { it.copy(voiceVoxSpeaker = value) }
     }
 
     fun onAutoSmallTalkIntervalChange(value: AutoSmallTalkInterval) {
@@ -542,6 +555,8 @@ class SettingsViewModel(
             speakAssistantReplies = state.speakAssistantReplies,
             ttsVoiceProfile = state.ttsVoiceProfile,
             ttsSpeechRateMultiplier = state.ttsSpeechRateMultiplier,
+            voiceVoxEnabled = state.voiceVoxEnabled,
+            voiceVoxSpeaker = state.voiceVoxSpeaker,
             autoSmallTalkInterval = state.autoSmallTalkInterval,
             maxOutputTokens = state.maxOutputTokens,
             topK = state.topK,
@@ -748,6 +763,8 @@ class SettingsViewModel(
             speakAssistantReplies = state.speakAssistantReplies,
             ttsVoiceProfile = state.ttsVoiceProfile,
             ttsSpeechRateMultiplier = state.ttsSpeechRateMultiplier,
+            voiceVoxEnabled = state.voiceVoxEnabled,
+            voiceVoxSpeaker = state.voiceVoxSpeaker,
             autoSmallTalkInterval = state.autoSmallTalkInterval,
             maxOutputTokens = state.maxOutputTokens,
             topK = state.topK,

@@ -1,6 +1,6 @@
 # opencode handoff: guardian_of_the_plants
 
-Last updated: 2026-04-30 (Browser Log Viewer)
+Last updated: 2026-04-30 (Android VoiceVox Integration)
 
 ## Current Repository State
 
@@ -96,14 +96,15 @@ guardian_of_the_plants/
       controller/ChatController.java       POST /api/chat (SSE)
       controller/TtsController.java        POST /api/tts/synthesize, GET /api/tts/speakers
       controller/LogViewerController.java  GET /api/logs/chat, GET /api/logs/app
-      dto/ChatRequest.java
-      dto/ServerMessage.java
-      dto/TtsRequest.java
-      service/ChatService.java             SSE proxy + DB storage
-      service/TtsService.java              VoiceVOX audio_query → synthesis
-      service/ProviderResolver.java        .env provider config
-    src/main/resources/static/admin/
-      logs.html                            Browser log viewer UI
+       dto/ChatRequest.java
+       dto/ServerMessage.java
+       dto/TtsRequest.java
+       service/ChatService.java             SSE proxy + DB storage
+       service/TtsService.java              VoiceVOX audio_query → synthesis
+       service/TtsHealthService.java        VoiceVOX health check
+       service/ProviderResolver.java        .env provider config
+     src/main/resources/static/admin/
+       logs.html                            Browser log viewer UI
   .env                  Local secrets, ignored by Git
   .env.example          Shared environment template
   .gitattributes
@@ -353,10 +354,12 @@ Security direction:
 
 Current audio:
 
-- Uses Android internal `TextToSpeech`.
-- No cloud TTS currently.
-- `Speak guardian replies` setting exists.
-- Speech speed setting exists.
+- **Device TextToSpeech**: Android internal TTS (default for all providers).
+- **Server VoiceVox TTS**: Available for SERVER provider via toggle in Settings.
+  - `Speak guardian replies` must be ON.
+  - `Use VoiceVox TTS` toggle appears only for SERVER provider.
+  - 3 selectable speakers: 四国めたん (2), ずんだもん (3), 春日部つむぎ (8).
+  - Speech speed setting still applies to device TTS only.
 - Default speech speed: `1.2x`.
 
 Voice profile UI was simplified into guardian personality settings:
@@ -364,14 +367,15 @@ Voice profile UI was simplified into guardian personality settings:
 - Guardian personality.
 - Speak guardian replies.
 - Speech speed.
+- (SERVER only) Use VoiceVox TTS + VoiceVox speaker selection.
 
-Future direction:
+Architecture:
 
 ```text
-Android -> Spring Boot -> VOICEVOX Engine
+Android -> Spring Boot -> VOICEVOX Engine (Docker)
 ```
 
-VOICEVOX should eventually run via Docker. Be careful with CPU load and response latency. A job-based async flow may be better than synchronous generation.
+VOICEVOX is controlled via `VOICEVOX_ENABLED` in `.env`.
 
 ## Auto Small Talk State
 
@@ -548,13 +552,15 @@ Current server APIs:
 
 ```text
 GET  /api/health
+GET  /api/tts/health            (VoiceVOX version check)
 POST /api/app-start
-POST /api/chat       (SSE proxy to AI provider)
-POST /api/tts/synthesize  (VoiceVOX TTS → WAV)
-GET  /api/tts/speakers    (List available VoiceVOX speakers)
-GET  /api/logs/chat       (Chat history for browser viewer)
-GET  /api/logs/app        (App logs for browser viewer)
-GET  /admin/logs.html     (Browser log viewer UI)
+POST /api/chat                  (SSE proxy to AI provider)
+POST /api/tts/synthesize        (VoiceVOX TTS → WAV)
+GET  /api/tts/speakers          (List available VoiceVOX speakers)
+GET  /api/logs/chat             (Chat history for browser viewer)
+GET  /api/logs/app              (App logs for browser viewer)
+GET  /api/logs/health           (Server/DB status, log counts, error counts)
+GET  /admin/logs.html           (Browser log viewer UI)
 ```
 
 Example app-start request body:
@@ -619,15 +625,15 @@ be generated with the local Android SDK path. Do not commit APK outputs,
 
 Do not start with the full VPS architecture. Proceed in small validated steps.
 
-1. Confirm Android `SERVER` provider builds and runs with configured endpoint.
-2. Verify `POST /api/chat` SSE streaming through nginx to server to AI provider.
-3. Verify `chat_histories` rows are inserted in PostgreSQL during/after streaming.
-4. Add HTTPS/TLS for the VPS nginx endpoint.
-5. Decide how Android should configure or discover the production API endpoint.
-6. ~~VOICEVOX integration~~ → Done (server-side TTS endpoints available).
-7. ~~Browser log viewer~~ → Done (`/admin/logs.html`).
-8. Next: Android integration with server-side TTS (replace Android TextToSpeech with VoiceVOX WAV playback for SERVER provider).
-9. Later, move RAG/knowledge management server-side.
+1. ~~Confirm Android `SERVER` provider builds and runs with configured endpoint.~~ → Done.
+2. ~~Verify `POST /api/chat` SSE streaming through nginx to server to AI provider.~~ → Done.
+3. ~~Verify `chat_histories` rows are inserted in PostgreSQL during/after streaming.~~ → Done.
+4. Build release APK and test VoiceVox toggle on physical device (Xiaomi 2602BPC18G).
+5. Add HTTPS/TLS for the VPS nginx endpoint (Let's Encrypt).
+6. Add server-side rate limiting for `/api/tts/synthesize`.
+7. Consider async TTS job queue for high-latency scenarios.
+8. Later, move RAG/knowledge management server-side.
+9. Add browser log viewer auth (basic auth or token).
 
 ## Completed Milestones
 
@@ -677,6 +683,26 @@ Provider selection is server-side (.env).
 Android ProviderType.SERVER routes through VPS.
 Existing LOCAL / CLOUD / OLLAMA_CLOUD providers remain functional.
 ```
+
+### Milestone 5: Android VoiceVox Integration (2026-04-30)
+
+> Implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.
+
+```text
+Android app offers toggle between device TextToSpeech and server VoiceVox TTS.
+VoiceVox toggle visible only when ProviderType.SERVER is selected.
+3 selectable VoiceVox speakers: 四国めたん (2), ずんだもん (3), 春日部つむぎ (8).
+Settings saved via DataStore (voicevox_enabled, voicevox_speaker).
+GuardianReplySpeechEffect routes to ServerTtsApi when VoiceVox is enabled.
+ServerTtsApi downloads WAV via POST /api/tts/synthesize, plays with MediaPlayer.
+VoiceVox disabled → falls back to Android TextToSpeech.
+Build compiles cleanly (warnings only, no errors).
+```
+
+Bug fixes during this milestone:
+- `ServerTtsApi.kt` — OkHttp `toMediaType` / `toRequestBody` API usage fixed
+- `ServerChatRequest.kt` — `Map<String, Any>` → `Map<String, JsonElement>` (kotlinx.serialization)
+- `ServerChatApi.kt` — Ktor `readUTF8Line(Int.MAX_VALUE)` + `toJsonElement` helper
 
 ## Git Commands For opencode
 
@@ -784,9 +810,11 @@ This repository is now ready for normal development as:
 IdeaTest0409/guardian_of_the_plants
 ```
 
-The Android app has been migrated. Docker Compose now runs nginx, the Spring
-Boot server, PostgreSQL, and VoiceVOX Engine. The verified backend milestones are:
+The Android app has been migrated and includes server-side VoiceVox TTS integration
+(3 speakers: 四国めたん, ずんだもん, 春日部つむぎ) with toggle between device TTS
+and VoiceVox for SERVER provider. Docker Compose runs nginx, the Spring Boot server,
+PostgreSQL, and VoiceVOX Engine. The verified backend milestones are:
 Android app-start logging into PostgreSQL, server-side chat API with SSE proxy,
-server-side VoiceVOX TTS synthesis, and browser-based log viewer at `/admin/logs.html`.
-The next practical milestone is Android integration with server-side TTS, followed
-by HTTPS and production-safe secret handling.
+server-side VoiceVOX TTS synthesis, browser-based log viewer at `/admin/logs.html`,
+and Android VoiceVox integration. The next practical steps are: build and test on
+physical device, add HTTPS/TLS, and add server-side rate limiting.

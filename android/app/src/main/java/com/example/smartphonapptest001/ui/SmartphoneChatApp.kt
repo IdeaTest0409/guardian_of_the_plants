@@ -42,6 +42,8 @@ import com.example.smartphonapptest001.data.model.PlantImageSelectionMode
 import com.example.smartphonapptest001.data.model.PlantSpecies
 import com.example.smartphonapptest001.data.model.ProviderType
 import com.example.smartphonapptest001.data.model.TtsVoiceProfile
+import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
+import com.example.smartphonapptest001.data.network.ServerTtsApi
 import com.example.smartphonapptest001.ui.screen.ChatScreen
 import com.example.smartphonapptest001.ui.screen.LogsScreen
 import com.example.smartphonapptest001.ui.screen.SettingsScreen
@@ -101,6 +103,8 @@ fun SmartphoneChatApp(
     onSpeakAssistantRepliesChange: (Boolean) -> Unit,
     onTtsVoiceProfileChange: (TtsVoiceProfile) -> Unit,
     onTtsSpeechRateMultiplierChange: (Double) -> Unit,
+    onVoiceVoxEnabledChange: (Boolean) -> Unit,
+    onVoiceVoxSpeakerChange: (VoiceVoxSpeaker) -> Unit,
     onAutoSmallTalkIntervalChange: (AutoSmallTalkInterval) -> Unit,
     onMaxOutputTokensChange: (Int) -> Unit,
     onTopKChange: (Int) -> Unit,
@@ -120,6 +124,8 @@ fun SmartphoneChatApp(
         enabled = settingsState.speakAssistantReplies,
         voiceProfile = settingsState.ttsVoiceProfile,
         speechRateMultiplier = settingsState.ttsSpeechRateMultiplier,
+        voiceVoxEnabled = settingsState.voiceVoxEnabled && settingsState.providerType == ProviderType.SERVER,
+        voiceVoxSpeaker = settingsState.voiceVoxSpeaker,
         appLogger = appLogger,
     )
 
@@ -239,6 +245,8 @@ fun SmartphoneChatApp(
                     onSpeakAssistantRepliesChange = onSpeakAssistantRepliesChange,
                     onTtsVoiceProfileChange = onTtsVoiceProfileChange,
                     onTtsSpeechRateMultiplierChange = onTtsSpeechRateMultiplierChange,
+                    onVoiceVoxEnabledChange = onVoiceVoxEnabledChange,
+                    onVoiceVoxSpeakerChange = onVoiceVoxSpeakerChange,
                     onAutoSmallTalkIntervalChange = onAutoSmallTalkIntervalChange,
                     onMaxOutputTokensChange = onMaxOutputTokensChange,
                     onTopKChange = onTopKChange,
@@ -267,6 +275,8 @@ private fun GuardianReplySpeechEffect(
     enabled: Boolean,
     voiceProfile: TtsVoiceProfile,
     speechRateMultiplier: Double,
+    voiceVoxEnabled: Boolean,
+    voiceVoxSpeaker: VoiceVoxSpeaker,
     appLogger: AppLogger,
 ) {
     val context = LocalContext.current
@@ -322,50 +332,101 @@ private fun GuardianReplySpeechEffect(
         )
     }
 
-    LaunchedEffect(enabled, readyHolder.value, latestAssistantMessage?.id, latestAssistantMessage?.isPending, latestAssistantMessage?.content, voiceProfile, speechRateMultiplier) {
-        val tts = ttsHolder.value ?: return@LaunchedEffect
+    LaunchedEffect(enabled, readyHolder.value, latestAssistantMessage?.id, latestAssistantMessage?.isPending, latestAssistantMessage?.content, voiceProfile, speechRateMultiplier, voiceVoxEnabled, voiceVoxSpeaker) {
         val message = latestAssistantMessage ?: return@LaunchedEffect
-        if (!enabled || !readyHolder.value || message.isPending || message.content.isBlank()) return@LaunchedEffect
+        if (!enabled || message.isPending || message.content.isBlank()) return@LaunchedEffect
         if (lastSpokenMessageId.value == message.id) return@LaunchedEffect
 
-        val speakText = message.content
-        val utteranceId = "assistant-${message.id}"
-        appLogger.log(
-            AppLogSeverity.INFO,
-            "VoiceOutput",
-            "Speaking assistant reply",
-            details = buildString {
-                appendLine("messageId=${message.id}")
-                appendLine("chars=${speakText.length}")
-                appendLine("enabled=$enabled")
-                appendLine("voiceProfile=${voiceProfile.name}")
-                appendLine("pitch=${voiceProfile.pitch}")
-                appendLine("speechRate=${voiceProfile.speechRate}")
-                appendLine("speechRateMultiplier=$speechRateMultiplier")
-                appendLine("effectiveSpeechRate=${voiceProfile.speechRate * speechRateMultiplier.toFloat()}")
-            },
-        )
-        runCatching {
-            tts.stop()
-            tts.setPitch(voiceProfile.pitch)
-            tts.setSpeechRate((voiceProfile.speechRate * speechRateMultiplier.toFloat()).coerceIn(0.1f, 4.0f))
-            val speakResult = tts.speak(speakText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
-            if (speakResult == TextToSpeech.ERROR) {
+        if (voiceVoxEnabled) {
+            val baseUrl = com.example.smartphonapptest001.BuildConfig.GUARDIAN_API_BASE_URL.trim().trimEnd('/')
+            if (baseUrl.isBlank()) {
+                appLogger.log(AppLogSeverity.ERROR, "VoiceVox", "TTS base URL is not configured")
+                return@LaunchedEffect
+            }
+            val serverTtsApi = ServerTtsApi(baseUrl, appLogger)
+            val speakText = message.content
+            val utteranceId = "assistant-${message.id}"
+            appLogger.log(
+                AppLogSeverity.INFO,
+                "VoiceVox",
+                "Synthesizing with VoiceVox",
+                details = buildString {
+                    appendLine("messageId=${message.id}")
+                    appendLine("chars=${speakText.length}")
+                    appendLine("speaker=${voiceVoxSpeaker.label}")
+                },
+            )
+            runCatching {
+                val wavData = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId)
+                if (wavData != null && wavData.isNotEmpty()) {
+                    val tempFile = java.io.File.createTempFile("voicevox_tts_", ".wav", context.cacheDir)
+                    tempFile.writeBytes(wavData)
+                    val mp = android.media.MediaPlayer()
+                    mp.setDataSource(tempFile.absolutePath)
+                    mp.prepare()
+                    mp.setOnCompletionListener {
+                        mp.release()
+                        runCatching { tempFile.delete() }
+                    }
+                    mp.setOnErrorListener { _, _, _ ->
+                        mp.release()
+                        runCatching { tempFile.delete() }
+                        true
+                    }
+                    mp.start()
+                }
+                lastSpokenMessageId.value = message.id
+            }.onFailure { error ->
                 appLogger.log(
-                    AppLogSeverity.WARN,
-                    "VoiceOutput",
-                    "TextToSpeech speak returned error",
-                    details = "messageId=${message.id}",
+                    AppLogSeverity.ERROR,
+                    "VoiceVox",
+                    "VoiceVox synthesis failed",
+                    details = error.message.orEmpty(),
                 )
             }
-            lastSpokenMessageId.value = message.id
-        }.onFailure { error ->
+        } else {
+            val tts = ttsHolder.value ?: return@LaunchedEffect
+            if (!readyHolder.value) return@LaunchedEffect
+
+            val speakText = message.content
+            val utteranceId = "assistant-${message.id}"
             appLogger.log(
-                AppLogSeverity.ERROR,
+                AppLogSeverity.INFO,
                 "VoiceOutput",
-                "Speaking assistant reply failed",
-                details = error.message.orEmpty(),
+                "Speaking assistant reply",
+                details = buildString {
+                    appendLine("messageId=${message.id}")
+                    appendLine("chars=${speakText.length}")
+                    appendLine("enabled=$enabled")
+                    appendLine("voiceProfile=${voiceProfile.name}")
+                    appendLine("pitch=${voiceProfile.pitch}")
+                    appendLine("speechRate=${voiceProfile.speechRate}")
+                    appendLine("speechRateMultiplier=$speechRateMultiplier")
+                    appendLine("effectiveSpeechRate=${voiceProfile.speechRate * speechRateMultiplier.toFloat()}")
+                },
             )
+            runCatching {
+                tts.stop()
+                tts.setPitch(voiceProfile.pitch)
+                tts.setSpeechRate((voiceProfile.speechRate * speechRateMultiplier.toFloat()).coerceIn(0.1f, 4.0f))
+                val speakResult = tts.speak(speakText, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+                if (speakResult == TextToSpeech.ERROR) {
+                    appLogger.log(
+                        AppLogSeverity.WARN,
+                        "VoiceOutput",
+                        "TextToSpeech speak returned error",
+                        details = "messageId=${message.id}",
+                    )
+                }
+                lastSpokenMessageId.value = message.id
+            }.onFailure { error ->
+                appLogger.log(
+                    AppLogSeverity.ERROR,
+                    "VoiceOutput",
+                    "Speaking assistant reply failed",
+                    details = error.message.orEmpty(),
+                )
+            }
         }
     }
 }

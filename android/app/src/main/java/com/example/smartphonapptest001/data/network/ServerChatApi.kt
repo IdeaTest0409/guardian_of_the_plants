@@ -13,6 +13,8 @@ import io.ktor.http.contentType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 class ServerChatApi(
     private val client: HttpClient,
@@ -35,7 +37,7 @@ class ServerChatApi(
             deviceId = deviceId,
             conversationId = conversationId,
             messages = messages,
-            options = options,
+            options = options?.mapValues { (_, v) -> toJsonElement(v) },
         )
 
         val response = client.post("$normalizedUrl/chat") {
@@ -47,7 +49,7 @@ class ServerChatApi(
         val channel = response.bodyAsChannel()
         val buffer = StringBuilder()
         while (!channel.isClosedForRead) {
-            val line = channel.readUTF8Line() ?: break
+            val line = channel.readUTF8Line(Int.MAX_VALUE) ?: break
             if (line.isBlank()) continue
             if (!line.startsWith("data:")) continue
 
@@ -92,5 +94,15 @@ class ServerChatApi(
 
     companion object {
         private const val TAG = "ServerChatApi"
+
+        private fun toJsonElement(value: Any): JsonElement {
+            return when (value) {
+                is String -> JsonPrimitive(value)
+                is Number -> JsonPrimitive(value)
+                is Boolean -> JsonPrimitive(value)
+                is JsonElement -> value
+                else -> JsonPrimitive(value.toString())
+            }
+        }
     }
 }
