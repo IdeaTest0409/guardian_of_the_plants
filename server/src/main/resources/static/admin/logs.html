@@ -41,6 +41,24 @@
         .count-label { font-size: 0.8rem; color: #888; }
         .error-count { color: #dc2626; font-weight: 600; }
         .last-updated { text-align: center; font-size: 0.75rem; color: #888; margin-top: 8px; }
+        .flow-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafafa; }
+        .flow-card:hover { border-color: #93c5fd; }
+        .flow-card.error { border-left: 4px solid #ef4444; }
+        .flow-card.complete { border-left: 4px solid #22c55e; }
+        .flow-card.in-progress { border-left: 4px solid #f59e0b; }
+        .flow-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .flow-title { font-weight: 600; font-size: 0.85rem; }
+        .flow-meta { font-size: 0.75rem; color: #888; display: flex; gap: 12px; flex-wrap: wrap; }
+        .flow-steps { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+        .flow-step { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 500; white-space: nowrap; }
+        .flow-step.ok { background: #dcfce7; color: #166534; }
+        .flow-step.error { background: #fef2f2; color: #991b1b; }
+        .flow-step.pending { background: #f3f4f6; color: #9ca3af; }
+        .flow-arrow { color: #d1d5db; font-size: 0.7rem; }
+        .flow-detail { font-size: 0.75rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
+        .flow-detail.error-detail { color: #dc2626; }
+        .flow-type-chat { color: #2563eb; }
+        .flow-type-tts { color: #7c3aed; }
         @media (max-width: 600px) {
             th, td { font-size: 0.75rem; padding: 6px 4px; }
             .hide-mobile { display: none; }
@@ -53,6 +71,24 @@
 
     <div class="status-bar" id="status-bar">
         <div class="status-item status-info">Loading...</div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>Request Flow <span class="count-label" id="flow-count"></span></h2>
+            <div class="btn-group">
+                <button class="refresh-btn" onclick="loadFlow()">Refresh</button>
+                <select class="hours-select" id="flow-hours">
+                    <option value="1">1h</option>
+                    <option value="6" selected>6h</option>
+                    <option value="24">24h</option>
+                </select>
+                <span class="auto-refresh">Auto-refresh: 30s</span>
+            </div>
+        </div>
+        <div id="flow-container">
+            <div class="empty-msg">Loading...</div>
+        </div>
     </div>
 
     <div class="section">
@@ -130,9 +166,18 @@
             return new Date(ts).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
         }
 
+        function fmtShort(ts) {
+            if (!ts) return '';
+            return new Date(ts).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        }
+
         function esc(s) {
             if (!s) return '';
             return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function safeStr(s) {
+            return s != null ? String(s) : '';
         }
 
         function loadHealth() {
@@ -150,11 +195,118 @@
                     if (data.chatErrorCount > 0) {
                         parts.push('<span class="status-item status-error">Chat Errors: ' + data.chatErrorCount + '</span>');
                     }
-                    parts.push('<span class="status-item status-info">Chats: ' + (data.chatHistoryCount || 0) + ' | Logs: ' + (data.appLogCount || 0) + '</span>');
+                    if (data.traceErrorCount > 0) {
+                        parts.push('<span class="status-item status-error">Flow Errors: ' + data.traceErrorCount + '</span>');
+                    }
+                    parts.push('<span class="status-item status-info">Chats: ' + (data.chatHistoryCount || 0) + ' | Logs: ' + (data.appLogCount || 0) + ' | Flows: ' + (data.traceCount || 0) + '</span>');
                     bar.innerHTML = parts.join('');
                 })
                 .catch(e => {
                     document.getElementById('status-bar').innerHTML = '<span class="status-item status-error">Health check failed: ' + esc(e.message) + '</span>';
+                });
+        }
+
+        function getChatSteps(requestType) {
+            return requestType === 'chat'
+                ? ['received', 'ai_call', 'ai_response', 'db_saved', 'complete']
+                : ['received', 'voicevox_call', 'voicevox_response', 'complete'];
+        }
+
+        function getStepLabel(step) {
+            const labels = {
+                'received': '受信',
+                'ai_call': 'AI呼出',
+                'ai_response': 'AI応答',
+                'db_saved': 'DB保存',
+                'voicevox_call': 'VoiceVox呼出',
+                'voicevox_response': '音声生成',
+                'complete': '完了',
+                'error': 'エラー',
+            };
+            return labels[step] || step;
+        }
+
+        function loadFlow() {
+            const hours = parseInt(document.getElementById('flow-hours')?.value || '6');
+            fetch('/api/logs/flow?limit=50')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('flow-count').textContent = '(' + data.length + '件)';
+                    const container = document.getElementById('flow-container');
+                    if (data.length === 0) {
+                        container.innerHTML = '<div class="empty-msg">No data</div>';
+                        return;
+                    }
+
+                    const allSteps = {
+                        chat: ['received', 'ai_call', 'ai_response', 'db_saved', 'complete'],
+                        tts: ['received', 'voicevox_call', 'voicevox_response', 'complete'],
+                    };
+
+                    container.innerHTML = data.map(row => {
+                        const traceId = safeStr(row.trace_id);
+                        const requestType = safeStr(row.request_type);
+                        const latestStep = safeStr(row.latest_step);
+                        const latestStatus = safeStr(row.latest_status);
+                        const latestDetail = safeStr(row.latest_detail);
+                        const latestAt = fmtShort(row.latest_at);
+                        const firstAt = fmtShort(row.first_at);
+
+                        const steps = allSteps[requestType] || [];
+                        const hasError = latestStatus === 'error' || latestStep === 'error';
+                        const isComplete = latestStep === 'complete';
+                        const cardClass = hasError ? 'error' : (isComplete ? 'complete' : 'in-progress');
+                        const typeClass = requestType === 'chat' ? 'flow-type-chat' : 'flow-type-tts';
+
+                        let stepsHtml = '';
+                        let prevCompleted = true;
+                        for (let i = 0; i < steps.length; i++) {
+                            const s = steps[i];
+                            if (i > 0) stepsHtml += '<span class="flow-arrow">&rarr;</span>';
+
+                            if (hasError && s === 'error') {
+                                stepsHtml += '<span class="flow-step error">エラー</span>';
+                                prevCompleted = false;
+                                break;
+                            }
+                            if (s === latestStep && isComplete) {
+                                stepsHtml += '<span class="flow-step ok">' + getStepLabel(s) + '</span>';
+                            } else if (s === latestStep && !isComplete) {
+                                stepsHtml += '<span class="flow-step ok">' + getStepLabel(s) + '</span>';
+                                prevCompleted = false;
+                            } else if (steps.indexOf(latestStep) > i) {
+                                stepsHtml += '<span class="flow-step ok">' + getStepLabel(s) + '</span>';
+                            } else {
+                                stepsHtml += '<span class="flow-step pending">' + getStepLabel(s) + '</span>';
+                                prevCompleted = false;
+                            }
+                        }
+
+                        let detailHtml = '';
+                        let timeInfo = latestAt;
+                        if (firstAt !== latestAt) timeInfo = firstAt + ' → ' + latestAt;
+
+                        if (hasError && latestDetail) {
+                            detailHtml = '<div class="flow-detail error-detail">Error: ' + esc(latestDetail) + '</div>';
+                        } else if (latestDetail) {
+                            detailHtml = '<div class="flow-detail">' + esc(latestDetail) + '</div>';
+                        }
+
+                        return '<div class="flow-card ' + cardClass + '">' +
+                            '<div class="flow-header">' +
+                                '<span class="flow-title"><span class="' + typeClass + '">' + esc(requestType.toUpperCase()) + '</span> / trace: ' + esc(traceId.substring(0, 8)) + '</span>' +
+                                '<span class="flow-meta">' +
+                                    '<span>' + timeInfo + '</span>' +
+                                    '<span class="' + (hasError ? 'severity-ERROR' : 'status-ok') + '">' + (hasError ? 'エラー' : '完了') + '</span>' +
+                                '</span>' +
+                            '</div>' +
+                            '<div class="flow-steps">' + stepsHtml + '</div>' +
+                            detailHtml +
+                            '</div>';
+                    }).join('');
+                })
+                .catch(e => {
+                    document.getElementById('flow-container').innerHTML = '<div class="empty-msg">Error: ' + esc(e.message) + '</div>';
                 });
         }
 
@@ -224,7 +376,8 @@
             if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
             const hours = Math.min(
                 parseInt(document.getElementById('chat-hours')?.value || '1'),
-                parseInt(document.getElementById('app-hours')?.value || '1')
+                parseInt(document.getElementById('app-hours')?.value || '1'),
+                parseInt(document.getElementById('flow-hours')?.value || '1')
             );
             fetch('/api/logs/download?hours=' + hours + '&type=all')
                 .then(r => {
@@ -250,6 +403,7 @@
 
         function loadAll() {
             loadHealth();
+            loadFlow();
             loadChatLogs();
             loadAppLogs();
             document.getElementById('last-updated').textContent = 'Last updated: ' + new Date().toLocaleTimeString('ja-JP');

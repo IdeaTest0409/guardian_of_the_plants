@@ -354,20 +354,27 @@ private fun GuardianReplySpeechEffect(
                 val wavData = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId)
                 if (wavData != null && wavData.isNotEmpty()) {
                     val tempFile = java.io.File.createTempFile("voicevox_tts_", ".wav", context.cacheDir)
-                    tempFile.writeBytes(wavData)
-                    val mp = android.media.MediaPlayer()
-                    mp.setDataSource(tempFile.absolutePath)
-                    mp.prepare()
-                    mp.setOnCompletionListener {
-                        mp.release()
+                    var mp: android.media.MediaPlayer? = null
+                    try {
+                        tempFile.writeBytes(wavData)
+                        mp = android.media.MediaPlayer()
+                        mp.setDataSource(tempFile.absolutePath)
+                        mp.prepare()
+                        mp.setOnCompletionListener {
+                            mp.release()
+                            runCatching { tempFile.delete() }
+                        }
+                        mp.setOnErrorListener { _, _, _ ->
+                            mp.release()
+                            runCatching { tempFile.delete() }
+                            true
+                        }
+                        mp.start()
+                    } catch (e: Exception) {
+                        mp?.release()
                         runCatching { tempFile.delete() }
+                        throw e
                     }
-                    mp.setOnErrorListener { _, _, _ ->
-                        mp.release()
-                        runCatching { tempFile.delete() }
-                        true
-                    }
-                    mp.start()
                 }
                 lastSpokenMessageId.value = message.id
             }.onFailure { error ->

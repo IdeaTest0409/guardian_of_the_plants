@@ -1,6 +1,6 @@
 # Development Status: guardian_of_the_plants
 
-Last updated: 2026-04-30 (Android VoiceVox Integration)
+Last updated: 2026-05-01 (Request Flow Tracing + TTS Android Fix)
 
 ## Development Tools
 
@@ -100,16 +100,55 @@ Bug fixes during this milestone:
 - `ServerChatRequest.kt` — `Map<String, Any>` → `Map<String, JsonElement>` (kotlinx.serialization)
 - `ServerChatApi.kt` — Ktor `readUTF8Line(Int.MAX_VALUE)` + `toJsonElement` helper
 
+### Milestone 6: Request Flow Tracing (Done - with opencode)
+
+```text
+Every chat and TTS request gets a unique trace_id at server entry point.
+Each pipeline step is recorded in request_traces table: received → ai_call → ai_response → db_saved → complete
+Errors are captured with context: which step failed, error message, timing.
+GET /api/logs/flow returns recent request flows with step progression.
+GET /api/logs/flow/{traceId} returns detailed steps for a specific trace.
+/admin/logs.html shows Request Flow section with card-based UI.
+Flow cards show step-by-step progress with color coding (green=ok, red=error, gray=pending).
+Status bar includes flow error count and total trace count.
+```
+
+Key files created:
+- `server/src/main/java/com/example/guardianplants/RequestTraceRepository.java`
+- `server/src/main/java/com/example/guardianplants/service/RequestTraceService.java`
+- `db/init/002_request_traces.sql`
+
+Key files modified:
+- `server/src/main/java/com/example/guardianplants/controller/ChatController.java` — trace_id generation on entry
+- `server/src/main/java/com/example/guardianplants/service/ChatService.java` — AI call/response/DB save/error tracing
+- `server/src/main/java/com/example/guardianplants/controller/TtsController.java` — trace_id generation on entry
+- `server/src/main/java/com/example/guardianplants/controller/LogViewerController.java` — /api/logs/flow endpoints
+- `server/src/main/resources/static/admin/logs.html` — Request Flow UI section
+
+### Milestone 7: TTS Android Fixes (Done - with opencode)
+
+```text
+ServerTtsApi.kt readTimeout increased from 60s to 120s to handle long TTS generation.
+Added writeTimeout 30s for request body upload.
+GuardianReplySpeechEffect MediaPlayer resource leak fixed:
+  prepare() failure now properly releases MediaPlayer and deletes temp WAV file.
+  try-catch ensures cleanup even on unexpected exceptions.
+```
+
+Key files modified:
+- `android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerTtsApi.kt` — timeout tuning
+- `android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt` — MediaPlayer leak fix
+
 ## Current Architecture
 
 ```text
 Android app (Jetpack Compose)
   -> VPS nginx (HTTPS planned)
     -> Spring Boot server (Java 17)
-      -> PostgreSQL (chat_histories, app_logs)
+      -> PostgreSQL (chat_histories, app_logs, request_traces)
       -> VoiceVOX Engine (Docker, configurable)
       -> external AI / Ollama Cloud
-  -> Browser: /admin/logs.html (dashboard, no auth)
+  -> Browser: /admin/logs.html (dashboard, no auth, request flow tracking)
 ```
 
 ## VPS Deployment
@@ -140,11 +179,11 @@ docker compose up -d --build db server nginx
 
 | Risk | Status | Mitigation |
 |------|--------|------------|
-| Secrets in `.env` | ⚠️ Manual | Never commit `.env` |
-| Android Filament native crashes | ⚠️ Known | 3D expression off by default |
-| VoiceVOX CPU load | ⚠️ Expected | `VOICEVOX_ENABLED=false` to disable |
-| VPS nginx HTTP (no TLS) | ⚠️ Planned | HTTPS/TLS next milestone |
-| `local.properties` machine-specific | ℹ️ Info | SDK path set for `tomok`'s machine |
+| Secrets in `.env` | Manual | Never commit `.env` |
+| Android Filament native crashes | Known | 3D expression off by default |
+| VoiceVOX CPU load | Expected | `VOICEVOX_ENABLED=false` to disable |
+| VPS nginx HTTP (no TLS) | Planned | HTTPS/TLS next milestone |
+| `local.properties` machine-specific | Info | SDK path set for `tomok`'s machine |
 
 ## Next Steps
 
@@ -154,6 +193,7 @@ docker compose up -d --build db server nginx
 4. Consider async TTS job queue for high-latency scenarios
 5. Move RAG/knowledge management server-side
 6. Add browser log viewer auth (basic auth or token)
+7. Verify request_traces table auto-created via Docker init script
 
 ## Git State
 

@@ -1,6 +1,7 @@
 package com.example.guardianplants.controller;
 
 import com.example.guardianplants.dto.TtsRequest;
+import com.example.guardianplants.service.RequestTraceService;
 import com.example.guardianplants.service.TtsHealthService;
 import com.example.guardianplants.service.TtsService;
 import org.slf4j.Logger;
@@ -24,10 +25,12 @@ public class TtsController {
 
     private final TtsService ttsService;
     private final TtsHealthService ttsHealthService;
+    private final RequestTraceService traceService;
 
-    public TtsController(TtsService ttsService, TtsHealthService ttsHealthService) {
+    public TtsController(TtsService ttsService, TtsHealthService ttsHealthService, RequestTraceService traceService) {
         this.ttsService = ttsService;
         this.ttsHealthService = ttsHealthService;
+        this.traceService = traceService;
     }
 
     @PostMapping(value = "/synthesize", produces = "audio/wav")
@@ -37,18 +40,28 @@ public class TtsController {
                 .body(Map.of("error", "Text is required"));
         }
 
+        String traceId = traceService.generateTraceId();
+        traceService.recordReceived(traceId, "tts", "speaker=" + request.speaker() + " text=" + request.text().substring(0, Math.min(50, request.text().length())));
+
+        long startTime = System.currentTimeMillis();
         try {
+            traceService.recordVoiceVoxCall(traceId, request.speaker());
             byte[] wavData = ttsService.synthesize(request.text(), request.speaker());
+            long duration = System.currentTimeMillis() - startTime;
+            traceService.recordVoiceVoxResponse(traceId, wavData.length, duration);
+            traceService.recordComplete(traceId, "tts");
             return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_TYPE, "audio/wav")
                 .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(wavData.length))
                 .body(wavData);
         } catch (IllegalStateException e) {
             log.warn("TTS request when disabled");
+            traceService.recordError(traceId, "tts", "voicevox_call", "TTS disabled");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("TTS synthesis failed", e);
+            traceService.recordError(traceId, "tts", "voicevox_call", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", "VoiceVOX unavailable: " + e.getMessage()));
         }

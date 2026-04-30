@@ -268,9 +268,9 @@ private fun List<ChatMessage>.toServerMessages(): List<ServerMessage> =
             for (attachment in imageAttachments) {
                 contentArray.add(
                     buildJsonObject {
-                        put("type", "image_url")
+                        put("type", JsonPrimitive("image_url"))
                         put("image_url", buildJsonObject {
-                            put("url", attachment.dataUrl!!)
+                            put("url", JsonPrimitive(attachment.dataUrl!!))
                         })
                     }
                 )

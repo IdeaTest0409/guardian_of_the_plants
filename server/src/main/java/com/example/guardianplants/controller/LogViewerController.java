@@ -1,12 +1,14 @@
 package com.example.guardianplants.controller;
 
 import com.example.guardianplants.LogViewerRepository;
+import com.example.guardianplants.RequestTraceRepository;
 import com.example.guardianplants.service.TtsHealthService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,11 +27,13 @@ public class LogViewerController {
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final LogViewerRepository logViewerRepository;
+    private final RequestTraceRepository requestTraceRepository;
     private final JdbcTemplate jdbcTemplate;
     private final TtsHealthService ttsHealthService;
 
-    public LogViewerController(LogViewerRepository logViewerRepository, JdbcTemplate jdbcTemplate, TtsHealthService ttsHealthService) {
+    public LogViewerController(LogViewerRepository logViewerRepository, RequestTraceRepository requestTraceRepository, JdbcTemplate jdbcTemplate, TtsHealthService ttsHealthService) {
         this.logViewerRepository = logViewerRepository;
+        this.requestTraceRepository = requestTraceRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.ttsHealthService = ttsHealthService;
     }
@@ -42,6 +46,16 @@ public class LogViewerController {
     @GetMapping("/app")
     public List<Map<String, Object>> appLogs(@RequestParam(defaultValue = "100") int limit) {
         return logViewerRepository.getAppLogs(Math.min(limit, 500));
+    }
+
+    @GetMapping("/flow")
+    public List<Map<String, Object>> requestFlows(@RequestParam(defaultValue = "50") int limit) {
+        return requestTraceRepository.getRecentTraces(Math.min(Math.max(limit, 1), 200));
+    }
+
+    @GetMapping("/flow/{traceId}")
+    public List<Map<String, Object>> traceDetail(@PathVariable String traceId) {
+        return requestTraceRepository.getTraceSteps(traceId);
     }
 
     @GetMapping("/health")
@@ -77,6 +91,17 @@ public class LogViewerController {
             result.put("chatErrorCount", errorCount);
         } catch (Exception e) {
             result.put("chatErrorCount", "error");
+        }
+
+        try {
+            Long traceCount = jdbcTemplate.queryForObject("SELECT COUNT(DISTINCT trace_id) FROM request_traces", Long.class);
+            result.put("traceCount", traceCount);
+            Long traceErrorCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT trace_id) FROM request_traces WHERE status = 'error'", Long.class);
+            result.put("traceErrorCount", traceErrorCount);
+        } catch (Exception e) {
+            result.put("traceCount", 0);
+            result.put("traceErrorCount", 0);
         }
 
         boolean voiceVoxHealthy = ttsHealthService.checkVoiceVoxHealth();
@@ -145,6 +170,30 @@ public class LogViewerController {
                 }
                 sb.append("\n");
             }
+        }
+
+        if ("all".equals(type) || "flow".equals(type)) {
+            sb.append("=== REQUEST FLOWS ===\n\n");
+            List<Map<String, Object>> traces = requestTraceRepository.getRecentTraces(cappedHours);
+            sb.append("Count: ").append(traces.size()).append("\n\n");
+            for (Map<String, Object> row : traces) {
+                String traceId = safeStr(row.get("trace_id"));
+                String requestType = safeStr(row.get("request_type"));
+                String latestStep = safeStr(row.get("latest_step"));
+                String latestStatus = safeStr(row.get("latest_status"));
+                String latestDetail = safeStr(row.get("latest_detail"));
+                String latestAt = formatTs(row.get("latest_at"));
+                String firstAt = formatTs(row.get("first_at"));
+                sb.append("[").append(latestAt).append("] ");
+                sb.append("trace=").append(traceId);
+                sb.append(" type=").append(requestType);
+                sb.append(" step=").append(latestStep);
+                sb.append(" status=").append(latestStatus);
+                if (!latestDetail.isEmpty()) sb.append(" detail=").append(latestDetail);
+                if (!firstAt.equals(latestAt)) sb.append(" started=").append(firstAt);
+                sb.append("\n");
+            }
+            sb.append("\n");
         }
 
         String filename = "guardian-logs-" + Instant.now().atZone(ZoneOffset.UTC)

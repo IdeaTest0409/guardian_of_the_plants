@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class ChatService {
@@ -25,21 +26,25 @@ public class ChatService {
     private final ProviderResolver providerResolver;
     private final ChatHistoryRepository chatHistoryRepository;
     private final ObjectMapper objectMapper;
+    private final RequestTraceService traceService;
 
     public ChatService(WebClient.Builder webClientBuilder,
                        ProviderResolver providerResolver,
                        ChatHistoryRepository chatHistoryRepository,
-                       ObjectMapper objectMapper) {
+                       ObjectMapper objectMapper,
+                       RequestTraceService traceService) {
         this.webClientBuilder = webClientBuilder;
         this.providerResolver = providerResolver;
         this.chatHistoryRepository = chatHistoryRepository;
         this.objectMapper = objectMapper;
+        this.traceService = traceService;
     }
 
-    public SseEmitter stream(ChatRequest request) {
+    public SseEmitter stream(ChatRequest request, String traceId) {
         SseEmitter emitter = new SseEmitter(120_000L);
         StringBuilder accumulatedContent = new StringBuilder();
         AtomicBoolean completed = new AtomicBoolean(false);
+        AtomicLong aiCallStart = new AtomicLong(0);
 
         String deviceId = request.deviceId() != null ? request.deviceId() : "unknown";
         String conversationId = request.conversationId() != null ? request.conversationId() : "default";
@@ -50,6 +55,7 @@ public class ChatService {
             if ("user".equalsIgnoreCase(lastUser.role())) {
                 String metadata = chatHistoryRepository.buildMetadata("server", model, "ok");
                 chatHistoryRepository.insert(deviceId, conversationId, "user", lastUser.contentAsString(), metadata);
+                traceService.recordDbSaved(traceId, "user");
             }
         }
 
@@ -58,6 +64,7 @@ public class ChatService {
         String apiKey = providerResolver.getApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             log.error("AI API key is not configured");
+            traceService.recordError(traceId, "chat", "ai_call", "API key not configured");
             try {
                 emitter.send(SseEmitter.event().data("{\"error\":\"AI API key is not configured\"}"));
             } catch (IOException e) {
@@ -66,6 +73,9 @@ public class ChatService {
             emitter.complete();
             return emitter;
         }
+
+        traceService.recordAiCall(traceId, model);
+        aiCallStart.set(System.currentTimeMillis());
 
         webClientBuilder.build()
             .post()
@@ -89,9 +99,14 @@ public class ChatService {
                             String data = chunk.substring(6).trim();
                             if ("[DONE]".equals(data)) {
                                 completed.set(true);
+                                long aiDuration = System.currentTimeMillis() - aiCallStart.get();
+                                int chars = accumulatedContent.length();
+                                traceService.recordAiResponse(traceId, chars, aiDuration);
                                 emitter.send(SseEmitter.event().data("[DONE]"));
                                 String metadata = chatHistoryRepository.buildMetadata("server", model, "completed");
                                 chatHistoryRepository.insert(deviceId, conversationId, "assistant", accumulatedContent.toString(), metadata);
+                                traceService.recordDbSaved(traceId, "assistant");
+                                traceService.recordComplete(traceId, "chat");
                                 emitter.complete();
                                 return;
                             }
@@ -109,8 +124,13 @@ public class ChatService {
                                     JsonNode finishReason = choices.get(0).get("finish_reason");
                                     if (finishReason != null && !finishReason.isNull()) {
                                         completed.set(true);
+                                        long aiDuration = System.currentTimeMillis() - aiCallStart.get();
+                                        int chars = accumulatedContent.length();
+                                        traceService.recordAiResponse(traceId, chars, aiDuration);
                                         String metadata = chatHistoryRepository.buildMetadata("server", model, "completed");
                                         chatHistoryRepository.insert(deviceId, conversationId, "assistant", accumulatedContent.toString(), metadata);
+                                        traceService.recordDbSaved(traceId, "assistant");
+                                        traceService.recordComplete(traceId, "chat");
                                     }
                                 }
                             } catch (Exception e) {
@@ -128,6 +148,7 @@ public class ChatService {
                 error -> {
                     if (completed.get()) return;
                     log.error("Upstream stream error", error);
+                    traceService.recordError(traceId, "chat", "ai_stream", error.getMessage());
                     String metadata = chatHistoryRepository.buildMetadata("server", model, "error: " + error.getMessage());
                     chatHistoryRepository.insert(deviceId, conversationId, "assistant", accumulatedContent.toString(), metadata);
                     emitter.completeWithError(error);
@@ -135,8 +156,15 @@ public class ChatService {
                 () -> {
                     if (completed.get()) return;
                     completed.set(true);
+                    long aiDuration = System.currentTimeMillis() - aiCallStart.get();
+                    int chars = accumulatedContent.length();
+                    if (chars > 0) {
+                        traceService.recordAiResponse(traceId, chars, aiDuration);
+                    }
                     String metadata = chatHistoryRepository.buildMetadata("server", model, "completed");
                     chatHistoryRepository.insert(deviceId, conversationId, "assistant", accumulatedContent.toString(), metadata);
+                    traceService.recordDbSaved(traceId, "assistant");
+                    traceService.recordComplete(traceId, "chat");
                     emitter.complete();
                 }
             );
@@ -144,6 +172,7 @@ public class ChatService {
         emitter.onTimeout(() -> {
             if (!completed.get()) {
                 log.warn("SSE emitter timeout");
+                traceService.recordError(traceId, "chat", "timeout", "SSE emitter timeout");
                 String metadata = chatHistoryRepository.buildMetadata("server", model, "timeout");
                 chatHistoryRepository.insert(deviceId, conversationId, "assistant", accumulatedContent.toString(), metadata);
             }
