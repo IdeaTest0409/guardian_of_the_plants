@@ -6,6 +6,48 @@ This document summarizes all changes made during the development session.
 
 ---
 
+## 3. Browser Log Viewer (2026-04-30)
+
+> **Note:** This feature was implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.
+
+### New Server Files
+
+| File | Purpose |
+|------|---------|
+| `server/.../LogViewerRepository.java` | DB queries for chat_histories and app_logs |
+| `server/.../controller/LogViewerController.java` | REST endpoints: `GET /api/logs/chat`, `GET /api/logs/app` |
+| `server/src/main/resources/static/admin/logs.html` | Browser UI: HTML + vanilla JS table display |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `nginx/default.conf` | Added `/admin/` proxy to server |
+
+### New Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/logs/chat` | Returns recent chat history (default 100, max 500) |
+| `GET` | `/api/logs/app` | Returns recent app logs (default 100, max 500) |
+
+### Browser Page
+
+Accessible at `/admin/logs.html` through nginx.
+
+**Features:**
+- Two sections: Chat History (detailed) and App Logs (simplified)
+- Latest-first ordering
+- Refresh buttons per section
+- Mobile-friendly responsive design (columns hidden on small screens)
+- Color-coded roles (user=blue, assistant=green) and severity levels
+
+**Chat History columns:** 日時 | デバイス | 会話ID | ロール | メッセージ | ステータス
+
+**App Logs columns:** 受信日時 | デバイス | バージョン | カテゴリ | メッセージ
+
+---
+
 ## 2. Server-side VoiceVOX TTS Integration (2026-04-30)
 
 > **Note:** This feature was implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.

@@ -1,6 +1,6 @@
 # opencode handoff: guardian_of_the_plants
 
-Last updated: 2026-04-30 (VoiceVOX TTS integration)
+Last updated: 2026-04-30 (Browser Log Viewer)
 
 ## Current Repository State
 
@@ -90,12 +90,20 @@ guardian_of_the_plants/
     src/.../guardianplants/
       GuardianPlantsServerApplication.java
       ChatHistoryRepository.java
+      LogViewerRepository.java            GET /api/logs/*
+      config/VoiceVoxConfig.java           VoiceVOX settings
       config/WebClientConfig.java
-      controller/ChatController.java         POST /api/chat (SSE)
+      controller/ChatController.java       POST /api/chat (SSE)
+      controller/TtsController.java        POST /api/tts/synthesize, GET /api/tts/speakers
+      controller/LogViewerController.java  GET /api/logs/chat, GET /api/logs/app
       dto/ChatRequest.java
       dto/ServerMessage.java
-      service/ChatService.java               SSE proxy + DB storage
-      service/ProviderResolver.java          .env provider config
+      dto/TtsRequest.java
+      service/ChatService.java             SSE proxy + DB storage
+      service/TtsService.java              VoiceVOX audio_query → synthesis
+      service/ProviderResolver.java        .env provider config
+    src/main/resources/static/admin/
+      logs.html                            Browser log viewer UI
   .env                  Local secrets, ignored by Git
   .env.example          Shared environment template
   .gitattributes
@@ -544,6 +552,9 @@ POST /api/app-start
 POST /api/chat       (SSE proxy to AI provider)
 POST /api/tts/synthesize  (VoiceVOX TTS → WAV)
 GET  /api/tts/speakers    (List available VoiceVOX speakers)
+GET  /api/logs/chat       (Chat history for browser viewer)
+GET  /api/logs/app        (App logs for browser viewer)
+GET  /admin/logs.html     (Browser log viewer UI)
 ```
 
 Example app-start request body:
@@ -614,8 +625,9 @@ Do not start with the full VPS architecture. Proceed in small validated steps.
 4. Add HTTPS/TLS for the VPS nginx endpoint.
 5. Decide how Android should configure or discover the production API endpoint.
 6. ~~VOICEVOX integration~~ → Done (server-side TTS endpoints available).
-7. Next: Android integration with server-side TTS (replace Android TextToSpeech with VoiceVOX WAV playback for SERVER provider).
-8. Later, move RAG/knowledge management server-side.
+7. ~~Browser log viewer~~ → Done (`/admin/logs.html`).
+8. Next: Android integration with server-side TTS (replace Android TextToSpeech with VoiceVOX WAV playback for SERVER provider).
+9. Later, move RAG/knowledge management server-side.
 
 ## Completed Milestones
 
@@ -626,6 +638,18 @@ Android app sends one log entry.
 Spring Boot receive it.
 PostgreSQL app_logs stores it.
 The Android app still works even if the server is unavailable.
+```
+
+### Milestone 4: Browser Log Viewer (2026-04-30)
+
+> Implemented with the assistance of [OpenCode](https://opencode.ai), an AI-powered CLI coding assistant.
+
+```text
+GET /api/logs/chat returns recent chat history from PostgreSQL.
+GET /api/logs/app returns recent app logs from PostgreSQL.
+/admin/logs.html serves a browser UI with two tables: Chat History and App Logs.
+Each section has a Refresh button for manual data reload.
+Mobile-friendly responsive design. No authentication required (dashboard mode).
 ```
 
 ### Milestone 3: Server-side VoiceVOX TTS (2026-04-30)
@@ -763,6 +787,6 @@ IdeaTest0409/guardian_of_the_plants
 The Android app has been migrated. Docker Compose now runs nginx, the Spring
 Boot server, PostgreSQL, and VoiceVOX Engine. The verified backend milestones are:
 Android app-start logging into PostgreSQL, server-side chat API with SSE proxy,
-and server-side VoiceVOX TTS synthesis. The next practical milestone is Android
-integration with server-side TTS, followed by HTTPS and production-safe secret
-handling.
+server-side VoiceVOX TTS synthesis, and browser-based log viewer at `/admin/logs.html`.
+The next practical milestone is Android integration with server-side TTS, followed
+by HTTPS and production-safe secret handling.

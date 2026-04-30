@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardian Plants - Log Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; color: #333; padding: 16px; }
+        h1 { font-size: 1.4rem; margin-bottom: 16px; text-align: center; }
+        .section { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .section-header h2 { font-size: 1.1rem; }
+        .refresh-btn { background: #4a90d9; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .refresh-btn:hover { background: #357abd; }
+        .refresh-btn:disabled { background: #aaa; cursor: wait; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: #f0f0f0; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; white-space: nowrap; }
+        td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+        tr:hover { background: #f9f9f9; }
+        .role-user { color: #2563eb; font-weight: 600; }
+        .role-assistant { color: #16a34a; font-weight: 600; }
+        .severity-ERROR { color: #dc2626; font-weight: 600; }
+        .severity-WARN { color: #d97706; }
+        .severity-INFO { color: #2563eb; }
+        .empty-msg { text-align: center; padding: 20px; color: #888; }
+        .count-label { font-size: 0.8rem; color: #888; }
+        @media (max-width: 600px) {
+            th, td { font-size: 0.75rem; padding: 6px 4px; }
+            .hide-mobile { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Guardian Plants - Log Viewer</h1>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>Chat History <span class="count-label" id="chat-count"></span></h2>
+            <button class="refresh-btn" onclick="loadChatLogs()">Refresh</button>
+        </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>日時</th>
+                        <th>デバイス</th>
+                        <th class="hide-mobile">会話ID</th>
+                        <th>ロール</th>
+                        <th>メッセージ</th>
+                        <th class="hide-mobile">ステータス</th>
+                    </tr>
+                </thead>
+                <tbody id="chat-tbody">
+                    <tr><td colspan="6" class="empty-msg">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>App Logs <span class="count-label" id="app-count"></span></h2>
+            <button class="refresh-btn" onclick="loadAppLogs()">Refresh</button>
+        </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>受信日時</th>
+                        <th>デバイス</th>
+                        <th class="hide-mobile">バージョン</th>
+                        <th>カテゴリ</th>
+                        <th>メッセージ</th>
+                    </tr>
+                </thead>
+                <tbody id="app-tbody">
+                    <tr><td colspan="5" class="empty-msg">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function fmt(ts) {
+            if (!ts) return '';
+            return new Date(ts).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+        }
+
+        function esc(s) {
+            if (!s) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+
+        function loadChatLogs() {
+            const btn = event?.target;
+            if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+            fetch('/api/logs/chat?limit=100')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('chat-count').textContent = '(' + data.length + '件)';
+                    const tbody = document.getElementById('chat-tbody');
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">No data</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.map(row => {
+                        const roleClass = row.role === 'user' ? 'role-user' : 'role-assistant';
+                        return '<tr>' +
+                            '<td>' + fmt(row.created_at) + '</td>' +
+                            '<td>' + esc(row.device_id) + '</td>' +
+                            '<td class="hide-mobile">' + esc(row.conversation_id) + '</td>' +
+                            '<td><span class="' + roleClass + '">' + esc(row.role) + '</span></td>' +
+                            '<td>' + esc(row.content_preview) + '</td>' +
+                            '<td class="hide-mobile">' + esc(row.status) + '</td>' +
+                            '</tr>';
+                    }).join('');
+                })
+                .catch(e => {
+                    document.getElementById('chat-tbody').innerHTML = '<tr><td colspan="6" class="empty-msg">Error: ' + esc(e.message) + '</td></tr>';
+                })
+                .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; } });
+        }
+
+        function loadAppLogs() {
+            const btn = event?.target;
+            if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+            fetch('/api/logs/app?limit=100')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('app-count').textContent = '(' + data.length + '件)';
+                    const tbody = document.getElementById('app-tbody');
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">No data</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.map(row => {
+                        const sevClass = 'severity-' + row.severity;
+                        return '<tr>' +
+                            '<td>' + fmt(row.received_at) + '</td>' +
+                            '<td>' + esc(row.device_id) + '</td>' +
+                            '<td class="hide-mobile">' + esc(row.app_version) + '</td>' +
+                            '<td>' + esc(row.category) + '</td>' +
+                            '<td><span class="' + sevClass + '">' + esc(row.message_preview) + '</span></td>' +
+                            '</tr>';
+                    }).join('');
+                })
+                .catch(e => {
+                    document.getElementById('app-tbody').innerHTML = '<tr><td colspan="5" class="empty-msg">Error: ' + esc(e.message) + '</td></tr>';
+                })
+                .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; } });
+        }
+
+        loadChatLogs();
+        loadAppLogs();
+    </script>
+</body>
+</html>
