@@ -90,9 +90,6 @@ fun SettingsScreen(
     onCloudBaseUrlChange: (String) -> Unit,
     onCloudModelChange: (String) -> Unit,
     onCloudApiKeyChange: (String) -> Unit,
-    onOllamaCloudBaseUrlChange: (String) -> Unit,
-    onOllamaCloudModelChange: (String) -> Unit,
-    onOllamaCloudApiKeyChange: (String) -> Unit,
     onStreamResponsesChange: (Boolean) -> Unit,
     onSpeakAssistantRepliesChange: (Boolean) -> Unit,
     onTtsVoiceProfileChange: (com.example.smartphonapptest001.data.model.TtsVoiceProfile) -> Unit,
@@ -119,7 +116,6 @@ fun SettingsScreen(
     var plantImageMenuExpanded by remember { mutableStateOf(false) }
     var localModelMenuExpanded by remember { mutableStateOf(false) }
     var localBackendMenuExpanded by remember { mutableStateOf(false) }
-    var ollamaCloudModelMenuExpanded by remember { mutableStateOf(false) }
     var autoSmallTalkMenuExpanded by remember { mutableStateOf(false) }
     var aiConfigDialogOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -180,7 +176,6 @@ fun SettingsScreen(
             text = when (state.providerType) {
                 ProviderType.LOCAL -> "Current mode: Local / on-device"
                 ProviderType.CLOUD -> "Current mode: Cloud / LM Studio"
-                ProviderType.OLLAMA_CLOUD -> "Current mode: Cloud / Ollama"
                 ProviderType.SERVER -> "Current mode: Server / VPS"
             },
             style = MaterialTheme.typography.labelLarge,
@@ -196,8 +191,6 @@ fun SettingsScreen(
                     "Local runtime: ${runtimeState.message ?: "Stopped"} | ${state.localExecutionBackend.label} | ${selectedPreset.label}"
                 state.providerType == ProviderType.CLOUD ->
                     "Cloud runtime: ${state.cloudBaseUrl.ifBlank { "unset" }} | ${state.cloudModel.ifBlank { "unset model" }}"
-                state.providerType == ProviderType.OLLAMA_CLOUD ->
-                    "Ollama Cloud: ${state.ollamaCloudBaseUrl.ifBlank { "unset" }} | ${state.ollamaCloudModel.ifBlank { "unset model" }}"
                 state.providerType == ProviderType.SERVER ->
                     "Server VPS endpoint configured via local.properties"
                 else -> "Runtime: unknown"
@@ -287,7 +280,6 @@ fun SettingsScreen(
             value = when (state.providerType) {
                 ProviderType.LOCAL -> "Local on-device"
                 ProviderType.CLOUD -> "Cloud LM Studio"
-                ProviderType.OLLAMA_CLOUD -> "Cloud Ollama"
                 ProviderType.SERVER -> "Server VPS"
             },
             expanded = providerMenuExpanded,
@@ -305,13 +297,6 @@ fun SettingsScreen(
                 text = { Text("Local on-device") },
                 onClick = {
                     onProviderTypeChange(ProviderType.LOCAL)
-                    providerMenuExpanded = false
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("Cloud Ollama") },
-                onClick = {
-                    onProviderTypeChange(ProviderType.OLLAMA_CLOUD)
                     providerMenuExpanded = false
                 },
             )
@@ -757,57 +742,6 @@ fun SettingsScreen(
                 onValueChange = onCloudApiKeyChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Cloud API key") },
-            )
-        }
-
-        if (state.providerType == ProviderType.OLLAMA_CLOUD) {
-            SectionLabel("Ollama Cloud")
-            OutlinedTextField(
-                value = state.ollamaCloudBaseUrl,
-                onValueChange = onOllamaCloudBaseUrlChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Ollama Cloud base URL") },
-                supportingText = { Text("OpenAI-compatible endpoint. Default: https://ollama.com/v1") },
-            )
-            SelectionField(
-                label = "Ollama Cloud model",
-                value = state.ollamaCloudModel.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL },
-                expanded = ollamaCloudModelMenuExpanded,
-                onExpandedChange = { ollamaCloudModelMenuExpanded = it },
-                onDismiss = { ollamaCloudModelMenuExpanded = false },
-            ) {
-                AppSettings.OLLAMA_CLOUD_MODELS.forEach { model ->
-                    val enabled = model in AppSettings.ENABLED_OLLAMA_CLOUD_MODELS
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = if (enabled) model else "$model (unavailable)",
-                                color = if (enabled) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                        },
-                        enabled = enabled,
-                        onClick = {
-                            onOllamaCloudModelChange(model)
-                            ollamaCloudModelMenuExpanded = false
-                        },
-                    )
-                }
-            }
-            Text(
-                text = "Only gemma4:31b-cloud is selectable for now. Other models are shown for reference.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = state.ollamaCloudApiKey,
-                onValueChange = onOllamaCloudApiKeyChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Ollama API key") },
-                supportingText = { Text("Required for Ollama Cloud. Stored on this device.") },
             )
         }
 

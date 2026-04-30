@@ -457,10 +457,10 @@ class ChatViewModel(
                             personality = activeSettings.guardianAngelPersonality,
                         ),
                     )
-                    if (activeSettings.providerType == ProviderType.OLLAMA_CLOUD || activeSettings.providerType == ProviderType.SERVER) {
+                    if (activeSettings.providerType == ProviderType.SERVER) {
                         appendLine()
                         appendLine()
-                        appendLine("Ollama Cloud strict response rules:")
+                        appendLine("Server strict response rules:")
                         appendLine("- You must output one minified JSON object only.")
                         appendLine("- The first character must be { and the last character must be }.")
                         appendLine("- Do not output markdown, prose, analysis, or code fences.")
@@ -517,7 +517,7 @@ class ChatViewModel(
                 appendLine("systemPromptChars=${diagnosticConversation.first().content.length}")
                 appendLine("cacheKey=$cacheKey")
                 appendLine("questionNeedsImageDiagnostic=${userMessage.content.needsImageDiagnostic()}")
-                appendLine("ollamaStrictJson=${activeSettings.providerType == ProviderType.OLLAMA_CLOUD || activeSettings.providerType == ProviderType.SERVER}")
+                appendLine("strictJsonMode=${activeSettings.providerType == ProviderType.SERVER}")
             },
         )
 
@@ -758,20 +758,6 @@ class ChatViewModel(
                 append(settings.cloudBaseUrl.ifBlank { "unset" })
                 append(" | ")
                 append(settings.cloudModel.ifBlank { "unset model" })
-            }
-
-            ProviderType.OLLAMA_CLOUD -> buildString {
-                append("Cloud / Ollama")
-                append(" | ")
-                append(activePlantProfile.displayName)
-                append(" | ")
-                append(settings.companionRole.label)
-                append(" | ")
-                append(settings.guardianAngelDisplayName)
-                append(" | ")
-                append(settings.ollamaCloudBaseUrl.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL })
-                append(" | ")
-                append(settings.ollamaCloudModel.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL })
             }
 
             ProviderType.SERVER -> buildString {

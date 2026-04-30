@@ -55,9 +55,6 @@ data class SettingsUiState(
     val cloudBaseUrl: String = AppSettings.DEFAULT_CLOUD_BASE_URL,
     val cloudModel: String = AppSettings.DEFAULT_CLOUD_MODEL,
     val cloudApiKey: String = "",
-    val ollamaCloudBaseUrl: String = AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL,
-    val ollamaCloudModel: String = AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-    val ollamaCloudApiKey: String = AppSettings.DEFAULT_OLLAMA_CLOUD_API_KEY,
     val streamResponses: Boolean = false,
     val speakAssistantReplies: Boolean = false,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
@@ -101,10 +98,6 @@ class SettingsViewModel(
                         appendLine("localModel=${settings.localModel}")
                         appendLine("cloudBaseUrl=${settings.cloudBaseUrl}")
                         appendLine("cloudModel=${settings.cloudModel}")
-                        appendLine("ollamaCloudBaseUrl=${settings.ollamaCloudBaseUrl}")
-                        appendLine("ollamaCloudModel=${settings.ollamaCloudModel}")
-                        appendLine("ollamaCloudApiKeyPresent=${settings.ollamaCloudApiKey.isNotBlank()}")
-                        appendLine("ollamaCloudApiKeyChars=${settings.ollamaCloudApiKey.length}")
                         appendLine("streamResponses=${settings.streamResponses}")
                         appendLine("speakAssistantReplies=${settings.speakAssistantReplies}")
                         appendLine("ttsVoiceProfile=${settings.ttsVoiceProfile.name}")
@@ -148,14 +141,6 @@ class SettingsViewModel(
                         cloudBaseUrl = settings.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL },
                         cloudModel = settings.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL },
                         cloudApiKey = settings.cloudApiKey,
-                        ollamaCloudBaseUrl = settings.ollamaCloudBaseUrl.ifBlank {
-                            AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL
-                        },
-                        ollamaCloudModel = settings.ollamaCloudModel.ifBlank {
-                            AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL
-                        }.takeIf { model -> model in AppSettings.ENABLED_OLLAMA_CLOUD_MODELS }
-                            ?: AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-                        ollamaCloudApiKey = settings.ollamaCloudApiKey,
                         streamResponses = settings.streamResponses,
                         speakAssistantReplies = settings.speakAssistantReplies,
                         ttsVoiceProfile = settings.ttsVoiceProfile,
@@ -305,27 +290,6 @@ class SettingsViewModel(
 
     fun onCloudApiKeyChange(value: String) {
         _uiState.update { it.copy(cloudApiKey = value) }
-    }
-
-    fun onOllamaCloudBaseUrlChange(value: String) {
-        _uiState.update { it.copy(ollamaCloudBaseUrl = value) }
-    }
-
-    fun onOllamaCloudModelChange(value: String) {
-        if (value !in AppSettings.ENABLED_OLLAMA_CLOUD_MODELS) {
-            _uiState.update {
-                it.copy(
-                    ollamaCloudModel = AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-                    statusMessage = "$value is not available. Using ${AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL}.",
-                )
-            }
-            return
-        }
-        _uiState.update { it.copy(ollamaCloudModel = value, statusMessage = null) }
-    }
-
-    fun onOllamaCloudApiKeyChange(value: String) {
-        _uiState.update { it.copy(ollamaCloudApiKey = value) }
     }
 
     fun onStreamResponsesChange(value: Boolean) {
@@ -546,11 +510,6 @@ class SettingsViewModel(
             cloudBaseUrl = state.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL },
             cloudModel = state.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL },
             cloudApiKey = state.cloudApiKey,
-            ollamaCloudBaseUrl = state.ollamaCloudBaseUrl.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL },
-            ollamaCloudModel = state.ollamaCloudModel
-                .takeIf { it in AppSettings.ENABLED_OLLAMA_CLOUD_MODELS }
-                ?: AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-            ollamaCloudApiKey = state.ollamaCloudApiKey,
             streamResponses = state.streamResponses,
             speakAssistantReplies = state.speakAssistantReplies,
             ttsVoiceProfile = state.ttsVoiceProfile,
@@ -754,11 +713,6 @@ class SettingsViewModel(
             cloudBaseUrl = state.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL },
             cloudModel = state.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL },
             cloudApiKey = state.cloudApiKey,
-            ollamaCloudBaseUrl = state.ollamaCloudBaseUrl.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL },
-            ollamaCloudModel = state.ollamaCloudModel
-                .takeIf { it in AppSettings.ENABLED_OLLAMA_CLOUD_MODELS }
-                ?: AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-            ollamaCloudApiKey = state.ollamaCloudApiKey,
             streamResponses = state.streamResponses,
             speakAssistantReplies = state.speakAssistantReplies,
             ttsVoiceProfile = state.ttsVoiceProfile,
@@ -799,8 +753,6 @@ class SettingsViewModel(
                     appendLine("localModel=${next.localModel}")
                     appendLine("cloudBaseUrl=${next.cloudBaseUrl}")
                     appendLine("cloudModel=${next.cloudModel}")
-                    appendLine("ollamaCloudBaseUrl=${next.ollamaCloudBaseUrl}")
-                    appendLine("ollamaCloudModel=${next.ollamaCloudModel}")
                     appendLine("streamResponses=${next.streamResponses}")
                     appendLine("speakAssistantReplies=${next.speakAssistantReplies}")
                     appendLine("ttsVoiceProfile=${next.ttsVoiceProfile.name}")
@@ -894,10 +846,6 @@ private fun AppSettings.toSafeLogString(): String {
         append(", cloudModel=$cloudModel")
         append(", cloudApiKeyPresent=${cloudApiKey.isNotBlank()}")
         append(", cloudApiKeyChars=${cloudApiKey.length}")
-        append(", ollamaCloudBaseUrl=$ollamaCloudBaseUrl")
-        append(", ollamaCloudModel=$ollamaCloudModel")
-        append(", ollamaCloudApiKeyPresent=${ollamaCloudApiKey.isNotBlank()}")
-        append(", ollamaCloudApiKeyChars=${ollamaCloudApiKey.length}")
         append(", streamResponses=$streamResponses")
         append(", speakAssistantReplies=$speakAssistantReplies")
         append(", ttsVoiceProfile=$ttsVoiceProfile")

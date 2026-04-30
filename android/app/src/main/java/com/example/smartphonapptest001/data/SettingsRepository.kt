@@ -70,9 +70,6 @@ class DataStoreSettingsRepository(
                 cloudBaseUrl = prefs[Keys.cloudBaseUrl] ?: AppSettings.DEFAULT_CLOUD_BASE_URL,
                 cloudModel = prefs[Keys.cloudModel] ?: AppSettings.DEFAULT_CLOUD_MODEL,
                 cloudApiKey = prefs[Keys.cloudApiKey] ?: "",
-                ollamaCloudBaseUrl = prefs[Keys.ollamaCloudBaseUrl] ?: AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL,
-                ollamaCloudModel = prefs[Keys.ollamaCloudModel] ?: AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL,
-                ollamaCloudApiKey = prefs[Keys.ollamaCloudApiKey] ?: AppSettings.DEFAULT_OLLAMA_CLOUD_API_KEY,
                 streamResponses = prefs[Keys.streamResponses] ?: false,
                 speakAssistantReplies = prefs[Keys.speakAssistantReplies] ?: AppSettings.DEFAULT_SPEAK_ASSISTANT_REPLIES,
                 ttsVoiceProfile = parseTtsVoiceProfile(prefs[Keys.ttsVoiceProfile]),
@@ -114,11 +111,6 @@ class DataStoreSettingsRepository(
             prefs[Keys.cloudBaseUrl] = settings.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL }
             prefs[Keys.cloudModel] = settings.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL }
             prefs[Keys.cloudApiKey] = settings.cloudApiKey
-            prefs[Keys.ollamaCloudBaseUrl] =
-                settings.ollamaCloudBaseUrl.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_BASE_URL }
-            prefs[Keys.ollamaCloudModel] =
-                settings.ollamaCloudModel.ifBlank { AppSettings.DEFAULT_OLLAMA_CLOUD_MODEL }
-            prefs[Keys.ollamaCloudApiKey] = settings.ollamaCloudApiKey
             prefs[Keys.streamResponses] = settings.streamResponses
             prefs[Keys.speakAssistantReplies] = settings.speakAssistantReplies
             prefs[Keys.ttsVoiceProfile] = settings.ttsVoiceProfile.name
@@ -169,9 +161,6 @@ class DataStoreSettingsRepository(
         val cloudBaseUrl = stringPreferencesKey("cloud_base_url")
         val cloudModel = stringPreferencesKey("cloud_model")
         val cloudApiKey = stringPreferencesKey("cloud_api_key")
-        val ollamaCloudBaseUrl = stringPreferencesKey("ollama_cloud_base_url")
-        val ollamaCloudModel = stringPreferencesKey("ollama_cloud_model")
-        val ollamaCloudApiKey = stringPreferencesKey("ollama_cloud_api_key")
         val streamResponses = booleanPreferencesKey("stream_responses")
         val speakAssistantReplies = booleanPreferencesKey("speak_assistant_replies")
         val ttsVoiceProfile = stringPreferencesKey("tts_voice_profile")

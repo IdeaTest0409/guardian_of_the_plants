@@ -25,9 +25,6 @@ data class AppSettings(
     val cloudBaseUrl: String = DEFAULT_CLOUD_BASE_URL,
     val cloudModel: String = DEFAULT_CLOUD_MODEL,
     val cloudApiKey: String = "",
-    val ollamaCloudBaseUrl: String = DEFAULT_OLLAMA_CLOUD_BASE_URL,
-    val ollamaCloudModel: String = DEFAULT_OLLAMA_CLOUD_MODEL,
-    val ollamaCloudApiKey: String = DEFAULT_OLLAMA_CLOUD_API_KEY,
     val streamResponses: Boolean = false,
     val speakAssistantReplies: Boolean = DEFAULT_SPEAK_ASSISTANT_REPLIES,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
@@ -56,15 +53,6 @@ data class AppSettings(
                 modelConfig = ModelConfig(
                     id = resolvedCloudModel,
                     displayName = resolvedCloudModel,
-                ),
-            )
-
-            ProviderType.OLLAMA_CLOUD -> AIProvider.Cloud(
-                type = ProviderType.OLLAMA_CLOUD,
-                endpointConfig = activeEndpointConfig,
-                modelConfig = ModelConfig(
-                    id = resolvedOllamaCloudModel,
-                    displayName = resolvedOllamaCloudModel,
                 ),
             )
 
@@ -102,13 +90,6 @@ data class AppSettings(
                 streamResponses = streamResponses,
             )
 
-            ProviderType.OLLAMA_CLOUD -> EndpointConfig(
-                baseUrl = ollamaCloudBaseUrl.trim().ifBlank { DEFAULT_OLLAMA_CLOUD_BASE_URL },
-                model = resolvedOllamaCloudModel,
-                apiKey = ollamaCloudApiKey.trim().ifBlank { null },
-                streamResponses = streamResponses,
-            )
-
             ProviderType.SERVER -> EndpointConfig(
                 baseUrl = BuildConfig.GUARDIAN_API_BASE_URL.trim(),
                 model = "server",
@@ -123,28 +104,12 @@ data class AppSettings(
     private val resolvedCloudModel: String
         get() = cloudModel.trim().ifBlank { DEFAULT_CLOUD_MODEL }
 
-    private val resolvedOllamaCloudModel: String
-        get() = ollamaCloudModel.trim()
-            .takeIf { it in ENABLED_OLLAMA_CLOUD_MODELS }
-            ?: DEFAULT_OLLAMA_CLOUD_MODEL
-
     companion object {
         const val DEFAULT_LOCAL_BASE_URL = "on-device"
-        val DEFAULT_PROVIDER_TYPE = ProviderType.OLLAMA_CLOUD
+        val DEFAULT_PROVIDER_TYPE = ProviderType.SERVER
         const val DEFAULT_LOCAL_MODEL = "gemma-4-E2B-it"
         const val DEFAULT_CLOUD_BASE_URL = "http://192.168.0.11:1234"
         const val DEFAULT_CLOUD_MODEL = "gemma-4-e2b"
-        const val DEFAULT_OLLAMA_CLOUD_BASE_URL = "https://ollama.com/v1"
-        const val DEFAULT_OLLAMA_CLOUD_MODEL = "gemma4:31b-cloud"
-        const val DEFAULT_OLLAMA_CLOUD_API_KEY = ""
-        val ENABLED_OLLAMA_CLOUD_MODELS = setOf(
-            "gemma4:31b-cloud",
-        )
-        val OLLAMA_CLOUD_MODELS = listOf(
-            "gemma4:31b-cloud",
-            "kimi-k2.6:cloud",
-            "qwen3.6:35b",
-        )
         const val DEFAULT_MAX_OUTPUT_TOKENS = 2000
         const val DEFAULT_TOP_K = 64
         const val DEFAULT_TOP_P = 0.95
@@ -152,7 +117,7 @@ data class AppSettings(
         const val DEFAULT_THINKING_ENABLED = false
         const val DEFAULT_SPEAK_ASSISTANT_REPLIES = true
         const val DEFAULT_TTS_SPEECH_RATE_MULTIPLIER = 1.2
-        const val DEFAULT_VOICEVOX_ENABLED = false
+        const val DEFAULT_VOICEVOX_ENABLED = true
         const val DEFAULT_AVATAR_EXPRESSION_ENABLED = false
         const val DEFAULT_CHAT_STATUS_BAR_VISIBLE = false
         const val DEFAULT_MR_AVATAR_MOTION_ENABLED = false
