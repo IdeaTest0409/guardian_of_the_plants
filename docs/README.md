@@ -5,6 +5,7 @@ Use these documents by purpose:
 ```text
 development-status.md      Current milestone status, architecture, and next steps.
 android-build.md           Build the Android APK.
+android-identity.md        Android app name/applicationId notes.
 android-migration-list.md  Historical Android migration notes.
 local-api-smoke-test.md    Local Docker/nginx/server/db smoke test.
 vps-smoke-test.md          Ubuntu VPS deployment smoke test.
@@ -12,6 +13,9 @@ vps-operations.md          VPS operations, updates, logs, and backup notes.
 https-tls-plan.md          HTTPS/TLS plan for nginx on the VPS.
 assistant-db-save-debug.md Historical DB save debugging notes.
 db-migration.md           Current manual DB migration notes and future Flyway plan.
+mr-3d-safety.md            Android MR/3D crash-avoidance rules.
+tts-job-plan.md            Future async VoiceVOX job design.
+server-rag-plan.md         Future server-side RAG/knowledge migration plan.
 opencode-handoff.md        Broad project handoff and current status.
 session-change-log.md      Session-level implementation history.
 ```

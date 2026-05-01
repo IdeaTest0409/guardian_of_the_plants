@@ -25,18 +25,24 @@ val guardianApiBaseUrl = providers.gradleProperty("guardianApiBaseUrl")
     .orElse(readLocalProperty("guardian.api.baseUrl"))
     .get()
 
+val guardianAppStartReportingEnabled = providers.gradleProperty("guardianAppStartReportingEnabled")
+    .orElse(readLocalProperty("guardian.appStartReporting.enabled"))
+    .orElse("true")
+    .get()
+
 android {
     namespace = "com.example.smartphonapptest001"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.smartphonapptest001"
+        applicationId = "com.ideatest0409.guardianplants"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "GUARDIAN_API_BASE_URL", guardianApiBaseUrl.asBuildConfigString())
+        buildConfigField("boolean", "GUARDIAN_APP_START_REPORTING_ENABLED", guardianAppStartReportingEnabled.toBoolean().toString())
     }
 
     buildTypes {

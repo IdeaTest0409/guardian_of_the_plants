@@ -119,12 +119,15 @@ Temporary app-start reporting can also be configured in `local.properties`:
 
 ```properties
 guardian.api.baseUrl=http://<SERVER_IP_OR_HOSTNAME>/api
+guardian.appStartReporting.enabled=true
 ```
 
 This value is compiled into the debug APK. Keep `local.properties` out of Git.
 If the value is blank or missing, the Android app skips app-start reporting.
 If the value is malformed or does not end with `/api`, the app also skips
 reporting and writes a local warning log.
+Set `guardian.appStartReporting.enabled=false` to compile an APK that never
+sends startup reports.
 
 For VPS use after HTTPS is configured:
 
@@ -155,6 +158,12 @@ android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 This output is a build artifact. Do not commit it.
+
+The current Android identity is documented in:
+
+```text
+docs/android-identity.md
+```
 
 ## Build Release APK
 

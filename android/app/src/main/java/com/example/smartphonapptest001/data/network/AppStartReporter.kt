@@ -24,6 +24,14 @@ class AppStartReporter(
     private val baseUrl: String = BuildConfig.GUARDIAN_API_BASE_URL,
 ) {
     suspend fun report(context: Context) {
+        if (!BuildConfig.GUARDIAN_APP_START_REPORTING_ENABLED) {
+            logger.log(
+                AppLogSeverity.INFO,
+                "AppStartReporter",
+                "Server app-start reporting skipped because it is disabled by build config",
+            )
+            return
+        }
         val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
         if (normalizedBaseUrl.isBlank()) {
             logger.log(

@@ -11,13 +11,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.MediaType;
+import com.example.guardianplants.service.LogRetentionService;
+import com.example.guardianplants.config.RateLimitConfig;
 
 @WebMvcTest(AppStartController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AppStartControllerTest {
 
     @Autowired
@@ -25,6 +29,12 @@ class AppStartControllerTest {
 
     @MockBean
     private JdbcTemplate jdbcTemplate;
+
+    @MockBean
+    private LogRetentionService logRetentionService;
+
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void healthReturnsOk() throws Exception {

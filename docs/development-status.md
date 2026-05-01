@@ -110,7 +110,11 @@ Implemented:
 Compose healthchecks for nginx, server, and VoiceVOX
 Only nginx has a host ports mapping
 Android startup reporter validates guardian.api.baseUrl
+Android startup reporting can be disabled at build time
 Server-side chat and TTS input validation
+Server-side per-IP rate limiting for app-start, chat, and TTS
+Flyway migrations for server-managed schema
+Retention pruning for app_logs and chat_histories
 Server controller tests for health, app-start, and TTS
 GitHub Actions for Android debug build and server test/Docker build
 VPS helper scripts
@@ -144,9 +148,9 @@ db/init/001_init.sql
 db/init/002_request_traces.sql
 ```
 
-SQL files in `db/init` only run when PostgreSQL initializes a new volume. For
-an existing VPS volume, apply schema changes manually or introduce a migration
-tool.
+SQL files in `db/init` only run when PostgreSQL initializes a new volume. The
+Spring Boot server now also has Flyway migrations under
+`server/src/main/resources/db/migration` for ongoing schema management.
 
 ## Configuration
 
@@ -161,6 +165,9 @@ AI_API_KEY
 AI_MODEL
 VOICEVOX_ENABLED
 VOICEVOX_BASE_URL
+RATE_LIMIT_*
+RETENTION_*
+FLYWAY_ENABLED
 ```
 
 Android local build configuration:
@@ -168,6 +175,7 @@ Android local build configuration:
 ```text
 android/local.properties
 guardian.api.baseUrl=http://<SERVER_HOST>/api
+guardian.appStartReporting.enabled=true
 ```
 
 `android/local.properties` is intentionally ignored by Git. If the URL is
@@ -180,10 +188,10 @@ and writes a local warning log.
 |------|--------|------------|
 | VPS still uses HTTP | Open | Add HTTPS/TLS through nginx |
 | `/admin/logs.html` has no auth | Open | Add Basic Auth or token gate |
-| Chat/TTS rate limiting is missing | Open | Add nginx or Spring rate limiting |
+| Rate limiting is basic | Partially handled | Spring per-IP minute limits added; tune or move to nginx later |
 | TTS CPU load | Expected | Keep `VOICEVOX_ENABLED=false` when not needed |
 | Request trace growth | Partially handled | Retention guard added; consider scheduled cleanup |
-| `db/init` is not migration tooling | Open | Add Flyway/Liquibase or manual migration docs |
+| DB migration is new | Partially handled | Flyway added; verify carefully on VPS existing volumes |
 | Android Filament native crashes | Known | 3D expression off by default |
 | Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
 | Android `CLOUD` provider | Legacy | Kept for direct LM Studio testing; `SERVER` remains recommended |
@@ -192,8 +200,8 @@ and writes a local warning log.
 
 1. Add HTTPS/TLS to nginx on the VPS.
 2. Add authentication for `/admin/logs.html`.
-3. Add rate limiting for `/api/chat` and `/api/tts/synthesize`.
+3. Verify Flyway startup behavior on the VPS existing database.
 4. Decide whether to keep `CLOUD` provider visible in Android or mark it legacy.
-5. Add a proper DB migration workflow.
+5. Tune rate limit and retention values after real usage is observed.
 6. Consider async TTS jobs if VoiceVOX latency becomes a problem.
 7. Move RAG/knowledge management server-side.

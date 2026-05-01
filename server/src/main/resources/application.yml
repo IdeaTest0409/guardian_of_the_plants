@@ -10,6 +10,10 @@ spring:
     username: ${POSTGRES_USER:guardian_user}
     password: ${POSTGRES_PASSWORD:guardian_password}
     driver-class-name: org.postgresql.Driver
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    locations: classpath:db/migration
 
 ai:
   provider:
@@ -20,3 +24,15 @@ ai:
 voicevox:
   enabled: ${VOICEVOX_ENABLED:false}
   base-url: ${VOICEVOX_BASE_URL:http://voicevox:50021}
+
+guardian:
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    app-start-per-minute: ${RATE_LIMIT_APP_START_PER_MINUTE:30}
+    chat-per-minute: ${RATE_LIMIT_CHAT_PER_MINUTE:20}
+    tts-per-minute: ${RATE_LIMIT_TTS_PER_MINUTE:30}
+  retention:
+    enabled: ${RETENTION_ENABLED:true}
+    app-logs-days: ${RETENTION_APP_LOGS_DAYS:30}
+    chat-history-days: ${RETENTION_CHAT_HISTORY_DAYS:90}
+    prune-on-app-start-every: ${RETENTION_PRUNE_ON_APP_START_EVERY:100}

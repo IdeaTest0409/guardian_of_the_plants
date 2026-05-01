@@ -14,8 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.guardianplants.service.RequestTraceService;
 import com.example.guardianplants.service.TtsHealthService;
 import com.example.guardianplants.service.TtsService;
+import com.example.guardianplants.config.RateLimitConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +25,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(TtsController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class TtsControllerTest {
 
     @Autowired
@@ -36,6 +39,9 @@ class TtsControllerTest {
 
     @MockBean
     private RequestTraceService traceService;
+
+    @MockBean
+    private RateLimitConfig rateLimitConfig;
 
     @Test
     void synthesizeRejectsBlankText() throws Exception {

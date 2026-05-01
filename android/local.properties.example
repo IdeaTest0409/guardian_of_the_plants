@@ -21,3 +21,8 @@
 #
 # The value must start with http:// or https:// and end with /api.
 guardian.api.baseUrl=
+
+# Optional temporary app-start reporting switch.
+# true: report app start when guardian.api.baseUrl is valid.
+# false: never send app-start reports from this APK.
+guardian.appStartReporting.enabled=true

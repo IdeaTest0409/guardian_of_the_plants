@@ -2,6 +2,7 @@ package com.example.guardianplants;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.guardianplants.service.LogRetentionService;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,10 +18,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AppStartController {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
+    private final LogRetentionService logRetentionService;
 
-    public AppStartController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public AppStartController(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper, LogRetentionService logRetentionService) {
         this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
+        this.logRetentionService = logRetentionService;
     }
 
     @GetMapping("/health")
@@ -61,6 +64,7 @@ public class AppStartController {
             detailsJson,
             OffsetDateTime.now()
         );
+        logRetentionService.pruneAfterAppStartIfNeeded();
 
         return ResponseEntity.ok(Map.of(
             "status", "stored",
