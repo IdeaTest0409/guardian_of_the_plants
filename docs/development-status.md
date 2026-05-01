@@ -117,6 +117,8 @@ Android startup reporter validates guardian.api.baseUrl
 Android startup reporting can be disabled at build time
 Server-side chat and TTS input validation
 Server-side per-IP rate limiting for app-start, chat, and TTS
+Chat validation supports large image data URL messages up to 300,000 characters
+Android logs server-side SSE error payloads instead of treating them as empty replies
 Flyway migrations for server-managed schema
 Retention pruning for app_logs and chat_histories
 Server controller tests for health, app-start, and TTS

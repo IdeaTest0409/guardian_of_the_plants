@@ -5,6 +5,52 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Server Chat Validation And Android Error Visibility
+
+Fixed a case where the Android app appeared to receive no response from the
+server even though nginx showed successful `POST /api/chat` requests.
+
+Observed symptoms:
+
+```text
+Android logs:
+Server streaming completed
+totalChars=0
+replyChars=0
+
+nginx access log:
+POST /api/chat HTTP/1.1" 200 77
+POST /api/chat HTTP/1.1" 200 82
+```
+
+The small 77/82 byte responses indicated that Spring Boot was returning a short
+SSE error payload, not a real AI response.
+
+Likely trigger:
+
+```text
+Android realtime images are sent as base64 data URLs.
+imageDataUrlChars was around 90,000 to 105,000 characters.
+The server chat validation limit was 8,000 characters.
+```
+
+Fix:
+
+```text
+MAX_CHAT_MESSAGE_CHARS increased to 300,000.
+Chat validation failures are now logged by Spring Boot.
+Chat validation failures are recorded in request_traces.
+Android ServerChatApi now detects {"error":"..."} SSE payloads and logs them as errors instead of silently returning an empty reply.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/ApiValidation.java
+server/src/main/java/com/example/guardianplants/controller/ChatController.java
+android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatApi.kt
+```
+
 ### Log Download Fix
 
 Fixed the browser log viewer download endpoint.

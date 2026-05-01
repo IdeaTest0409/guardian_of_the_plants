@@ -74,6 +74,46 @@ timestamp with time zone >= character varying
 That was fixed by passing `OffsetDateTime` to the repository instead of a
 formatted timestamp string.
 
+## Smartphone Chat Check
+
+Use this when Android appears to send a message but receives an empty reply.
+
+Watch nginx first:
+
+```bash
+docker logs -f guardian-nginx
+```
+
+Expected when the smartphone sends chat:
+
+```text
+POST /api/chat HTTP/1.1
+```
+
+If nginx shows `POST /api/chat` with a very small response size such as `77` or
+`82` bytes, the server likely returned a short SSE error payload instead of a
+normal AI response.
+
+Then check server logs:
+
+```bash
+docker logs guardian-server --tail 200 | grep -i "validation\|api key\|upstream\|error"
+```
+
+Also check request flow:
+
+```bash
+curl "http://localhost/api/logs/flow?hours=1&limit=20"; echo
+```
+
+Known resolved issue:
+
+```text
+Image messages can exceed small validation limits because Android sends
+realtime images as base64 data URLs. The chat message validation limit is now
+300,000 characters, and validation failures are logged and traced.
+```
+
 ## Logs
 
 ```bash

@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public final class ApiValidation {
     public static final int MAX_CHAT_MESSAGES = 40;
-    public static final int MAX_CHAT_MESSAGE_CHARS = 8_000;
+    public static final int MAX_CHAT_MESSAGE_CHARS = 300_000;
     public static final int MAX_TTS_CHARS = 300;
     public static final int MIN_VOICEVOX_SPEAKER = 0;
     public static final int MAX_VOICEVOX_SPEAKER = 100;

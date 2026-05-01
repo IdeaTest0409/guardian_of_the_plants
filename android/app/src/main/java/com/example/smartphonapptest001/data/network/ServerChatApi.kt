@@ -14,7 +14,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 class ServerChatApi(
     private val client: HttpClient,
@@ -57,6 +59,21 @@ class ServerChatApi(
             if (payload == "[DONE]") {
                 emit(StreamToken(text = buffer.toString(), finished = true))
                 break
+            }
+
+            val errorMessage = parseErrorMessage(payload)
+            if (errorMessage != null) {
+                logger.log(
+                    AppLogSeverity.ERROR,
+                    "ServerChatApi",
+                    "Server chat API returned an error",
+                    details = listOf(
+                        "baseUrl=$normalizedUrl",
+                        "error=$errorMessage",
+                        "payload=${payload.take(500)}",
+                    ).joinToString(separator = "\n"),
+                )
+                error("Server chat API error: $errorMessage")
             }
 
             runCatching {
@@ -103,6 +120,14 @@ class ServerChatApi(
                 is JsonElement -> value
                 else -> JsonPrimitive(value.toString())
             }
+        }
+
+        private fun parseErrorMessage(payload: String): String? {
+            return runCatching {
+                val element = Json.parseToJsonElement(payload)
+                val obj = element as? JsonObject ?: return null
+                obj["error"]?.jsonPrimitive?.content
+            }.getOrNull()
         }
     }
 }
