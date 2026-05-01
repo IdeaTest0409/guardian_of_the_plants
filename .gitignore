@@ -41,3 +41,6 @@ voicevox_data/
 tmp/
 temp/
 *.tmp
+
+# Local build toolchains and caches
+.tools/
