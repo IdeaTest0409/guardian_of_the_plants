@@ -26,6 +26,9 @@
         .download-btn { background: #16a34a; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         .download-btn:hover { background: #15803d; }
         .download-btn:disabled { background: #aaa; cursor: wait; }
+        .delete-btn { background: #dc2626; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+        .delete-btn:hover { background: #b91c1c; }
+        .delete-btn:disabled { background: #aaa; cursor: wait; }
         .auto-refresh { font-size: 0.75rem; color: #888; margin-left: 8px; }
         .hours-select { font-size: 0.8rem; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -71,6 +74,9 @@
 <body>
     <h1>Guardian Plants - Log Viewer</h1>
     <div class="version-bar" id="version-bar">Version: loading...</div>
+    <div class="status-bar">
+        <button class="delete-btn" id="delete-all-logs-btn" onclick="deleteAllLogs()">ログを全て削除する</button>
+    </div>
 
     <div class="status-bar" id="status-bar">
         <div class="status-item status-info">Loading...</div>
@@ -433,6 +439,40 @@
                     alert('Download failed: ' + e.message);
                 })
                 .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Download'; } });
+        }
+
+        function deleteAllLogs() {
+            const btn = document.getElementById('delete-all-logs-btn');
+            const ok = confirm('DB上の Request Flow、Chat History、App Logs を全て削除します。よろしいですか？');
+            if (!ok) return;
+
+            btn.disabled = true;
+            btn.textContent = '削除中...';
+            fetch('/api/logs', { method: 'DELETE' })
+                .then(async r => {
+                    const text = await r.text();
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + ': ' + text.substring(0, 300));
+                    }
+                    return text ? JSON.parse(text) : {};
+                })
+                .then(data => {
+                    const deleted = data.deleted || {};
+                    alert(
+                        'ログを削除しました。' +
+                        '\nRequest Flow: ' + (deleted.requestTraceRows || 0) +
+                        '\nChat History: ' + (deleted.chatHistoryRows || 0) +
+                        '\nApp Logs: ' + (deleted.appLogRows || 0)
+                    );
+                    loadAll();
+                })
+                .catch(e => {
+                    alert('Delete failed: ' + e.message);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.textContent = 'ログを全て削除する';
+                });
         }
 
         function loadAll() {

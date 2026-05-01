@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -133,6 +134,15 @@ public class LogViewerController {
     @GetMapping("/version")
     public Map<String, Object> version() {
         return serverVersionInfo.asMap();
+    }
+
+    @DeleteMapping
+    public Map<String, Object> deleteAllLogs() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "deleted");
+        result.put("deleted", logViewerRepository.deleteAllDisplayedLogs());
+        result.put("timestamp", System.currentTimeMillis());
+        return result;
     }
 
     @GetMapping("/download")

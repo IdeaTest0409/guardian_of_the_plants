@@ -5,6 +5,27 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Browser Log Viewer Delete Action
+
+Added a server-side delete action for the browser log viewer.
+
+Behavior:
+
+```text
+/admin/logs.html shows a "ログを全て削除する" button.
+The browser asks for confirmation before deleting.
+DELETE /api/logs deletes the displayed log data from request_traces, chat_histories, and app_logs.
+The page reloads health, flow, chat, and app log panels after deletion.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/LogViewerRepository.java
+server/src/main/java/com/example/guardianplants/controller/LogViewerController.java
+server/src/main/resources/static/admin/logs.html
+```
+
 ### Android Chat UI And Voice Playback Reliability
 
 Improved the Android chat screen for small phone heights and made VoiceVOX

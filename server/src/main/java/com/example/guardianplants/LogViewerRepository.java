@@ -2,8 +2,10 @@ package com.example.guardianplants;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -103,5 +105,19 @@ public class LogViewerRepository {
             """,
             since
         );
+    }
+
+    @Transactional
+    public Map<String, Object> deleteAllDisplayedLogs() {
+        int requestTraceRows = jdbcTemplate.update("DELETE FROM request_traces");
+        int chatHistoryRows = jdbcTemplate.update("DELETE FROM chat_histories");
+        int appLogRows = jdbcTemplate.update("DELETE FROM app_logs");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("requestTraceRows", requestTraceRows);
+        result.put("chatHistoryRows", chatHistoryRows);
+        result.put("appLogRows", appLogRows);
+        result.put("totalRows", requestTraceRows + chatHistoryRows + appLogRows);
+        return result;
     }
 }
