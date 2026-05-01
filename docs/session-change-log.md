@@ -5,6 +5,48 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Server VoiceVOX WAV Buffer Fix
+
+Fixed a case where Android received an AI reply but did not play speech.
+
+Observed symptoms:
+
+```text
+Android logs:
+Assistant reply received
+TTS synthesis failed status=500
+VoiceVox returned empty audio
+
+Request flow:
+VoiceVOX synthesis failed: 200 OK from POST http://voicevox:50021/synthesis,
+but response failed with DataBufferLimitException: Exceeded limit on max bytes
+to buffer : 262144
+```
+
+Root cause:
+
+```text
+VoiceVOX returned a WAV response larger than Spring WebClient's default 256KB
+in-memory buffer. The server failed before it could return audio to Android.
+```
+
+Fix:
+
+```text
+Server WebClient maxInMemorySize increased to 10MB.
+TTS error responses now return JSON explicitly.
+TTS request tracing records synthesis failures as voicevox_synthesis.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/config/WebClientConfig.java
+server/src/main/java/com/example/guardianplants/controller/TtsController.java
+server/src/main/java/com/example/guardianplants/service/TtsService.java
+server/src/test/java/com/example/guardianplants/controller/TtsControllerTest.java
+```
+
 ### Server Chat Validation And Android Error Visibility
 
 Fixed a case where the Android app appeared to receive no response from the

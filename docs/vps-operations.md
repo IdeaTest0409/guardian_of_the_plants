@@ -114,6 +114,49 @@ realtime images as base64 data URLs. The chat message validation limit is now
 300,000 characters, and validation failures are logged and traced.
 ```
 
+## Smartphone TTS Check
+
+Use this when AI replies are visible on Android but no speech plays.
+
+Check recent request flows:
+
+```bash
+curl "http://localhost/api/logs/flow?hours=1&limit=20"; echo
+```
+
+If TTS shows an error like this, the server failed while reading the WAV
+response from VoiceVOX:
+
+```text
+DataBufferLimitException: Exceeded limit on max bytes to buffer : 262144
+```
+
+VoiceVOX may still have returned `200 OK`; the failure can be Spring WebClient's
+default 256KB in-memory buffer. The server WebClient buffer is configured above
+that limit so short VoiceVOX WAV responses can be returned to Android.
+
+Direct TTS smoke test:
+
+```bash
+curl -i -X POST http://localhost/api/tts/synthesize \
+  -H "Content-Type: application/json" \
+  -d '{"text":"こんにちは。音声テストです。","speaker":2}' \
+  --output /tmp/guardian-tts-test.wav
+```
+
+Check the output:
+
+```bash
+ls -lh /tmp/guardian-tts-test.wav
+```
+
+Expected: HTTP 200 and a non-empty WAV file. If the response is JSON, inspect it
+and then check server logs:
+
+```bash
+docker logs guardian-server --tail 100
+```
+
 ## Logs
 
 ```bash

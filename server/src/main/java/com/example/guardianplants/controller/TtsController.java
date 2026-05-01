@@ -35,7 +35,7 @@ public class TtsController {
         this.traceService = traceService;
     }
 
-    @PostMapping(value = "/synthesize", produces = "audio/wav")
+    @PostMapping("/synthesize")
     public ResponseEntity<?> synthesize(@RequestBody TtsRequest request) {
         var validationError = ApiValidation.validateTtsRequest(request);
         if (validationError.isPresent()) {
@@ -62,11 +62,13 @@ public class TtsController {
             log.warn("TTS request when disabled");
             traceService.recordError(traceId, "tts", "voicevox_call", "TTS disabled");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.error("TTS synthesis failed", e);
-            traceService.recordError(traceId, "tts", "voicevox_call", e.getMessage());
+            traceService.recordError(traceId, "tts", "voicevox_synthesis", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("error", "VoiceVOX unavailable: " + e.getMessage()));
         }
     }

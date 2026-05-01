@@ -3,6 +3,7 @@ package com.example.guardianplants.controller;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -63,6 +64,27 @@ class TtsControllerTest {
             .andExpect(status().isOk())
             .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "audio/wav"))
             .andExpect(content().bytes(new byte[] {1, 2, 3}));
+    }
+
+    @Test
+    void synthesizeReturnsJsonWhenVoiceVoxFails() throws Exception {
+        when(traceService.generateTraceId()).thenReturn("trace-test");
+        when(ttsService.synthesize(anyString(), anyInt()))
+            .thenThrow(new RuntimeException("VoiceVOX synthesis failed: buffer limit"));
+
+        mockMvc.perform(post("/api/tts/synthesize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\":\"hello\",\"speaker\":3}"))
+            .andExpect(status().isBadGateway())
+            .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
+            .andExpect(jsonPath("$.error", is("VoiceVOX unavailable: VoiceVOX synthesis failed: buffer limit")));
+
+        verify(traceService).recordError(
+            "trace-test",
+            "tts",
+            "voicevox_synthesis",
+            "VoiceVOX synthesis failed: buffer limit"
+        );
     }
 
     @Test

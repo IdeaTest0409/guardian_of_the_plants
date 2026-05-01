@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 @Service
@@ -44,6 +45,9 @@ public class TtsService {
         } catch (WebClientResponseException e) {
             log.error("VoiceVOX API error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new RuntimeException("VoiceVOX synthesis failed: " + e.getMessage(), e);
+        } catch (WebClientRequestException e) {
+            log.error("VoiceVOX request failed", e);
+            throw new RuntimeException("VoiceVOX request failed: " + e.getMessage(), e);
         } catch (Exception e) {
             log.error("TTS synthesis failed", e);
             throw new RuntimeException("TTS synthesis failed: " + e.getMessage(), e);
