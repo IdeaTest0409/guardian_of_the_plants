@@ -5,6 +5,31 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Android Approved Plant Image Reuse
+
+Added a chat-screen switch to skip repeated hidden image diagnostics after the
+current plant image has already been accepted by the diagnostic AI.
+
+Behavior:
+
+```text
+Default is off.
+Selecting or capturing a new plant image turns reuse off.
+When hidden image diagnostic returns guardianTargetPresent=true, reuse turns on.
+While reuse is on for the same image, Android skips the hidden diagnostic AI call.
+The selected image is still included in the main assistant request.
+Users can turn reuse off manually to force a fresh diagnostic.
+```
+
+Changed:
+
+```text
+android/app/src/main/java/com/example/smartphonapptest001/viewmodel/ChatViewModel.kt
+android/app/src/main/java/com/example/smartphonapptest001/ui/screen/ChatScreen.kt
+android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt
+android/app/src/main/java/com/example/smartphonapptest001/MainActivity.kt
+```
+
 ### Server VoiceVOX WAV Buffer Fix
 
 Fixed a case where Android received an AI reply but did not play speech.

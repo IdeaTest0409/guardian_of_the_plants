@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.text.style.TextOverflow
@@ -114,6 +115,7 @@ fun ChatScreen(
     localRuntimeState: LocalModelRuntimeState,
     localDownloadState: LocalModelDownloadState,
     selectedPlantImage: Attachment?,
+    onUsePreviousApprovedPlantImageChange: (Boolean) -> Unit,
     onRealtimePlantImageCaptured: (Attachment) -> Unit,
     onMessageChange: (String) -> Unit,
     onSendMessage: () -> Unit,
@@ -490,8 +492,55 @@ fun ChatScreen(
                 onSpeechInput = ::startSpeechInput,
             )
 
+            ApprovedPlantImageReuseToggle(
+                enabled = state.usePreviousApprovedPlantImage,
+                available = selectedImage != null && state.approvedPlantImageReuseAvailable,
+                onEnabledChange = onUsePreviousApprovedPlantImageChange,
+            )
+
             QuickReplyPresets(
                 onPresetTap = onMessageChange,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApprovedPlantImageReuseToggle(
+    enabled: Boolean,
+    available: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(34.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "確認済み画像を使う",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (available) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Switch(
+                checked = enabled && available,
+                onCheckedChange = onEnabledChange,
+                enabled = available,
             )
         }
     }

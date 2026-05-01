@@ -89,6 +89,7 @@ fun SmartphoneChatApp(
     onPlantImageSelectionModeChange: (PlantImageSelectionMode) -> Unit,
     onPlantImageCaptured: (Attachment) -> Unit,
     onRealtimePlantImageCaptured: (Attachment) -> Unit,
+    onUsePreviousApprovedPlantImageChange: (Boolean) -> Unit,
     onPlantImageClear: () -> Unit,
     onLocalExecutionBackendChange: (LocalExecutionBackend) -> Unit,
     onLocalModelChange: (String) -> Unit,
@@ -197,6 +198,7 @@ fun SmartphoneChatApp(
                         localDownloadState = settingsState.localModelServiceState.downloads[settingsState.localModel]
                             ?: LocalModelDownloadState(),
                         selectedPlantImage = settingsState.selectedPlantImage,
+                        onUsePreviousApprovedPlantImageChange = onUsePreviousApprovedPlantImageChange,
                         onRealtimePlantImageCaptured = onRealtimePlantImageCaptured,
                         onMessageChange = onMessageChange,
                         onSendMessage = onSendMessage,

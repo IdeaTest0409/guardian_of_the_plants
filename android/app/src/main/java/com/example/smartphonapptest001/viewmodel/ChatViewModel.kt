@@ -48,6 +48,8 @@ data class ChatUiState(
     val plantPresentHint: String = "",
     val selectedPlantImage: Attachment? = null,
     val plantImageSelectionMode: PlantImageSelectionMode = PlantImageSelectionMode.default(),
+    val usePreviousApprovedPlantImage: Boolean = false,
+    val approvedPlantImageReuseAvailable: Boolean = false,
     val avatarMoodOverride: GuardianAvatarMood? = null,
 )
 
@@ -127,8 +129,27 @@ class ChatViewModel(
             it.copy(
                 selectedPlantImage = attachment,
                 plantImageSelectionMode = mode,
+                usePreviousApprovedPlantImage = false,
+                approvedPlantImageReuseAvailable = false,
             )
         }
+    }
+
+    fun onUsePreviousApprovedPlantImageChanged(enabled: Boolean) {
+        markUserActivity()
+        _uiState.update {
+            it.copy(usePreviousApprovedPlantImage = enabled && it.approvedPlantImageReuseAvailable)
+        }
+        logger.log(
+            AppLogSeverity.INFO,
+            TAG,
+            "Previous approved plant image reuse changed",
+            details = structuredDetails(
+                "enabled" to enabled,
+                "selectedPlantImagePresent" to (uiState.value.selectedPlantImage != null),
+                "available" to uiState.value.approvedPlantImageReuseAvailable,
+            ),
+        )
     }
 
     fun onMessageChange(value: String) {
@@ -478,6 +499,20 @@ class ChatViewModel(
         )
         val nowMs = SystemClock.elapsedRealtime()
         val cached = cachedPlantImageDiagnostic
+        if (uiState.value.usePreviousApprovedPlantImage && cached?.cacheKey == cacheKey && cached.result.guardianTargetPresent == true) {
+            logger.log(
+                AppLogSeverity.INFO,
+                TAG,
+                "Hidden image diagnostic skipped by approved image reuse",
+                details = structuredDetails(
+                    "cacheKey" to cacheKey,
+                    "ageMs" to (nowMs - cached.timestampElapsedMs),
+                    "guardianTargetPresent" to cached.result.guardianTargetPresent,
+                    "imageStatus" to cached.result.imageStatus,
+                ),
+            )
+            return cached.result
+        }
         val needsFreshDiagnostic = shouldRunFreshPlantImageDiagnostic(
             messageText = userMessage.content,
             cacheKey = cacheKey,
@@ -576,6 +611,24 @@ class ChatViewModel(
             timestampElapsedMs = nowMs,
             result = result,
         )
+        if (result.guardianTargetPresent == true) {
+            _uiState.update {
+                it.copy(
+                    usePreviousApprovedPlantImage = true,
+                    approvedPlantImageReuseAvailable = true,
+                )
+            }
+            logger.log(
+                AppLogSeverity.INFO,
+                TAG,
+                "Previous approved plant image reuse enabled after diagnostic",
+                details = structuredDetails(
+                    "cacheKey" to cacheKey,
+                    "imageStatus" to result.imageStatus,
+                    "guardianTargetPresent" to result.guardianTargetPresent,
+                ),
+            )
+        }
         return result
     }
 

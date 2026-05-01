@@ -215,6 +215,7 @@ class MainActivity : ComponentActivity() {
                     onPlantImageSelectionModeChange = settingsViewModel::onPlantImageSelectionModeChange,
                     onPlantImageCaptured = settingsViewModel::onPlantImageCaptured,
                     onRealtimePlantImageCaptured = settingsViewModel::onRealtimePlantImageCaptured,
+                    onUsePreviousApprovedPlantImageChange = chatViewModel::onUsePreviousApprovedPlantImageChanged,
                     onPlantImageClear = settingsViewModel::clearPlantImage,
                     onLocalExecutionBackendChange = settingsViewModel::onLocalExecutionBackendChange,
                     onLocalModelChange = settingsViewModel::onLocalModelChange,
