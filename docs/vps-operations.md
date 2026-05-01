@@ -4,6 +4,15 @@ Operational commands for the Ubuntu VPS deployment.
 
 ## Update Code And Restart
 
+Helper script:
+
+```bash
+cd ~/guardian_of_the_plants
+bash scripts/vps-update.sh
+```
+
+Manual commands:
+
 ```bash
 cd ~/guardian_of_the_plants
 git pull
@@ -18,6 +27,15 @@ docker compose up -d --build db server nginx voicevox
 ```
 
 ## Health Checks
+
+Helper script:
+
+```bash
+cd ~/guardian_of_the_plants
+bash scripts/vps-status.sh
+```
+
+Manual commands:
 
 ```bash
 curl http://localhost/health; echo
@@ -87,8 +105,12 @@ cat guardian_plants_backup.sql | docker exec -i guardian-postgres psql -U guardi
 ## Security Checklist
 
 - Keep only nginx published externally.
-- Do not publish PostgreSQL, server, or VoiceVOX ports.
+- Do not publish PostgreSQL, server, or VoiceVOX ports with `ports:`.
+- It is acceptable for the server container to reach the external AI provider.
 - Keep `.env` off Git.
+- Store `AI_API_KEY` only on the server side in `.env`.
 - Add HTTPS/TLS.
 - Add authentication for `/admin/logs.html`.
 - Add rate limiting for chat and TTS endpoints.
+- On Windows, run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\secret-scan.ps1`
+  before public pushes when secrets changed.

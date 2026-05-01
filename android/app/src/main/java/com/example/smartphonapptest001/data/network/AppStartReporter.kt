@@ -16,6 +16,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
+import java.net.URI
 
 class AppStartReporter(
     private val client: HttpClient,
@@ -32,6 +33,19 @@ class AppStartReporter(
             )
             return
         }
+        val validationError = validateBaseUrl(normalizedBaseUrl)
+        if (validationError != null) {
+            logger.log(
+                AppLogSeverity.WARN,
+                "AppStartReporter",
+                "Server app-start reporting skipped because guardian API base URL is invalid",
+                details = listOf(
+                    "baseUrl=$normalizedBaseUrl",
+                    "reason=$validationError",
+                ).joinToString(separator = "\n"),
+            )
+            return
+        }
 
         logger.log(
             AppLogSeverity.INFO,
@@ -42,6 +56,20 @@ class AppStartReporter(
 
         checkHealth(normalizedBaseUrl)
         postAppStart(context, normalizedBaseUrl)
+    }
+
+    private fun validateBaseUrl(url: String): String? {
+        val uri = runCatching { URI(url) }.getOrElse { return it.message ?: "URL parse failed" }
+        if (uri.scheme != "http" && uri.scheme != "https") {
+            return "scheme must be http or https"
+        }
+        if (uri.host.isNullOrBlank()) {
+            return "host is required"
+        }
+        if (!uri.path.trimEnd('/').endsWith("/api")) {
+            return "path must end with /api"
+        }
+        return null
     }
 
     private suspend fun checkHealth(normalizedBaseUrl: String) {

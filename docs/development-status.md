@@ -4,8 +4,7 @@ Last updated: 2026-05-01
 
 ## Current Summary
 
-The project has moved beyond the initial app-start logging milestone. The
-current development baseline is:
+The project baseline is:
 
 ```text
 Android app (Jetpack Compose)
@@ -17,8 +16,8 @@ Android app (Jetpack Compose)
   -> Browser admin viewer at /admin/logs.html
 ```
 
-Android defaults to the `SERVER` provider. The VPS server owns the AI provider
-configuration so Android no longer needs an AI API key for server-routed chat.
+Android defaults to the `SERVER` provider. The VPS server owns AI provider
+configuration, so Android does not need an AI API key for server-routed chat.
 
 ## Completed Milestones
 
@@ -38,16 +37,6 @@ Spring Boot forwards the request to the configured AI provider.
 SSE streams back to Android.
 chat_histories stores user and assistant messages.
 AI provider configuration lives in server .env.
-```
-
-Important files:
-
-```text
-server/src/main/java/com/example/guardianplants/controller/ChatController.java
-server/src/main/java/com/example/guardianplants/service/ChatService.java
-server/src/main/java/com/example/guardianplants/service/ProviderResolver.java
-server/src/main/java/com/example/guardianplants/dto/ChatRequest.java
-android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatApi.kt
 ```
 
 ### Milestone 3: Server-Side VoiceVOX TTS
@@ -84,33 +73,19 @@ GET /api/logs/chat
 GET /api/logs/app
 GET /api/logs/health
 GET /api/logs/download
+GET /api/logs/flow
+GET /api/logs/flow/{traceId}
 ```
 
-The page shows chat history, app logs, health status, and request flow data. It
-currently has no authentication.
+The page has no authentication yet and must be protected before public use.
 
-### Milestone 5: Android VoiceVOX Integration
-
-Android settings include a server VoiceVOX toggle only for `SERVER` provider.
-When enabled, assistant replies are synthesized by the VPS through
-`POST /api/tts/synthesize`. If disabled, Android TextToSpeech is used.
-
-### Milestone 6: Request Flow Tracing
+### Milestone 5: Request Flow Tracing
 
 Every chat and TTS request receives a `trace_id`.
-
-Pipeline steps:
 
 ```text
 Chat: received -> ai_call -> ai_response -> db_saved -> complete/error
 TTS:  received -> voicevox_call -> voicevox_response -> complete/error
-```
-
-Endpoints:
-
-```text
-GET /api/logs/flow
-GET /api/logs/flow/{traceId}
 ```
 
 Storage:
@@ -119,7 +94,7 @@ Storage:
 request_traces
 ```
 
-Current retention guard:
+Retention guard:
 
 ```text
 prune every 200 inserted steps
@@ -127,22 +102,32 @@ keep at most 10,000 rows
 delete rows older than 7 days
 ```
 
-### Milestone 7: Android TTS Fixes
+### Milestone 6: Operational Hardening
 
-`ServerTtsApi` timeout handling was extended for long VoiceVOX generation.
-MediaPlayer cleanup now releases resources and deletes temporary WAV files on
-completion, error, and prepare/start exceptions.
+Implemented:
+
+```text
+Compose healthchecks for nginx, server, and VoiceVOX
+Only nginx has a host ports mapping
+Android startup reporter validates guardian.api.baseUrl
+Server-side chat and TTS input validation
+Server controller tests for health, app-start, and TTS
+GitHub Actions for Android debug build and server test/Docker build
+VPS helper scripts
+Local secret scan script
+```
 
 ## Current Docker Services
 
 ```text
 nginx     externally published on NGINX_HTTP_PORT, default 80
-server    internal only
-db        internal only
-voicevox  internal only
+server    no host port; reached by nginx over Compose network
+db        no host port; reached by server over Compose network
+voicevox  no host port; reached by server over Compose network
 ```
 
-Only nginx should be exposed to the network.
+Only nginx should be published with a host `ports:` mapping. The server must
+still be able to reach the external AI provider over outbound HTTPS.
 
 ## Current Database Tables
 
@@ -159,9 +144,9 @@ db/init/001_init.sql
 db/init/002_request_traces.sql
 ```
 
-Note: SQL files in `db/init` only run when PostgreSQL initializes a new volume.
-For an existing VPS volume, apply schema changes manually or introduce a real
-migration tool later.
+SQL files in `db/init` only run when PostgreSQL initializes a new volume. For
+an existing VPS volume, apply schema changes manually or introduce a migration
+tool.
 
 ## Configuration
 
@@ -185,7 +170,9 @@ android/local.properties
 guardian.api.baseUrl=http://<SERVER_HOST>/api
 ```
 
-`android/local.properties` is intentionally ignored by Git.
+`android/local.properties` is intentionally ignored by Git. If the URL is
+blank, malformed, or does not end with `/api`, Android skips startup reporting
+and writes a local warning log.
 
 ## Known Risks
 
@@ -193,11 +180,13 @@ guardian.api.baseUrl=http://<SERVER_HOST>/api
 |------|--------|------------|
 | VPS still uses HTTP | Open | Add HTTPS/TLS through nginx |
 | `/admin/logs.html` has no auth | Open | Add Basic Auth or token gate |
-| TTS CPU load | Expected | Keep `VOICEVOX_ENABLED=false` when not needed; add rate limiting |
+| Chat/TTS rate limiting is missing | Open | Add nginx or Spring rate limiting |
+| TTS CPU load | Expected | Keep `VOICEVOX_ENABLED=false` when not needed |
 | Request trace growth | Partially handled | Retention guard added; consider scheduled cleanup |
 | `db/init` is not migration tooling | Open | Add Flyway/Liquibase or manual migration docs |
 | Android Filament native crashes | Known | 3D expression off by default |
 | Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
+| Android `CLOUD` provider | Legacy | Kept for direct LM Studio testing; `SERVER` remains recommended |
 
 ## Next Steps
 

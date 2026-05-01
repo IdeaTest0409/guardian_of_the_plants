@@ -175,7 +175,7 @@ fun SettingsScreen(
         Text(
             text = when (state.providerType) {
                 ProviderType.LOCAL -> "Current mode: Local / on-device"
-                ProviderType.CLOUD -> "Current mode: Cloud / LM Studio"
+                ProviderType.CLOUD -> "Current mode: Cloud / LM Studio (legacy)"
                 ProviderType.SERVER -> "Current mode: Server / VPS (recommended)"
             },
             style = MaterialTheme.typography.labelLarge,
@@ -190,7 +190,7 @@ fun SettingsScreen(
                 state.providerType == ProviderType.LOCAL ->
                     "Local runtime: ${runtimeState.message ?: "Stopped"} | ${state.localExecutionBackend.label} | ${selectedPreset.label}"
                 state.providerType == ProviderType.CLOUD ->
-                    "Cloud runtime: ${state.cloudBaseUrl.ifBlank { "unset" }} | ${state.cloudModel.ifBlank { "unset model" }}"
+                    "Legacy cloud runtime: ${state.cloudBaseUrl.ifBlank { "unset" }} | ${state.cloudModel.ifBlank { "unset model" }}"
                 state.providerType == ProviderType.SERVER ->
                     "Server runtime: endpoint configured via android/local.properties"
                 else -> "Runtime: unknown"
@@ -279,7 +279,7 @@ fun SettingsScreen(
             label = "AI provider",
             value = when (state.providerType) {
                 ProviderType.LOCAL -> "Local on-device"
-                ProviderType.CLOUD -> "Cloud LM Studio"
+                ProviderType.CLOUD -> "Cloud LM Studio (legacy)"
                 ProviderType.SERVER -> "Server VPS (recommended)"
             },
             expanded = providerMenuExpanded,
@@ -287,7 +287,7 @@ fun SettingsScreen(
             onDismiss = { providerMenuExpanded = false },
         ) {
             DropdownMenuItem(
-                text = { Text("Cloud LM Studio") },
+                text = { Text("Cloud LM Studio (legacy)") },
                 onClick = {
                     onProviderTypeChange(ProviderType.CLOUD)
                     providerMenuExpanded = false
@@ -722,7 +722,12 @@ fun SettingsScreen(
         }
 
         if (state.providerType == ProviderType.CLOUD) {
-            SectionLabel("Cloud AI")
+            SectionLabel("Cloud AI (legacy)")
+            Text(
+                text = "Server VPS is recommended. This legacy mode keeps direct device-to-cloud testing available and may store an API key on this device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = state.cloudBaseUrl,
                 onValueChange = onCloudBaseUrlChange,

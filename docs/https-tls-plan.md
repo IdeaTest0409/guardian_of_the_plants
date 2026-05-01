@@ -29,6 +29,10 @@ Use a real domain name rather than a raw IP address for Let's Encrypt.
 guardian.api.baseUrl=https://<domain>/api
 ```
 
+The Android app validates this value at startup. If it is blank, malformed, or
+does not end with `/api`, startup reporting is skipped and a local app log is
+written.
+
 ## Notes
 
 - Do not send AI API keys from Android.

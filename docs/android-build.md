@@ -123,6 +123,14 @@ guardian.api.baseUrl=http://<SERVER_IP_OR_HOSTNAME>/api
 
 This value is compiled into the debug APK. Keep `local.properties` out of Git.
 If the value is blank or missing, the Android app skips app-start reporting.
+If the value is malformed or does not end with `/api`, the app also skips
+reporting and writes a local warning log.
+
+For VPS use after HTTPS is configured:
+
+```properties
+guardian.api.baseUrl=https://<DOMAIN>/api
+```
 
 ## Build Debug APK
 
@@ -224,6 +232,17 @@ Server-side components  -> Docker Compose
 
 If reproducible APK creation on Linux is needed, prefer adding a GitHub Actions
 Android build workflow before creating a custom Android build Docker image.
+
+## GitHub Actions
+
+The repository includes:
+
+```text
+.github/workflows/android-build.yml
+```
+
+The workflow builds `:app:assembleDebug` on Ubuntu with JDK 17 and Android SDK.
+It creates a temporary CI-only `local.properties`; that file is not committed.
 
 ## Troubleshooting
 

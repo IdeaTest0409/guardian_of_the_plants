@@ -17,6 +17,9 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    networks:
+      - frontend
+      - backend
 
   server:
     build:
@@ -44,6 +47,8 @@ services:
       retries: 5
       start_period: 30s
     restart: unless-stopped
+    networks:
+      - backend
 
   db:
     image: postgres:16-alpine
@@ -61,6 +66,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - backend
 
   voicevox:
     image: voicevox/voicevox_engine:cpu-ubuntu20.04-latest
@@ -76,7 +83,13 @@ services:
       retries: 3
       start_period: 60s
     restart: unless-stopped
+    networks:
+      - backend
 
 volumes:
   postgres_data:
   voicevox_data:
+
+networks:
+  frontend:
+  backend:

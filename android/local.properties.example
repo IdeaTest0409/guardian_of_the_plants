@@ -15,4 +15,9 @@
 #
 # Physical device or VPS example:
 # guardian.api.baseUrl=http://<SERVER_IP_OR_HOSTNAME>/api
+#
+# Production/VPS with HTTPS example:
+# guardian.api.baseUrl=https://<DOMAIN>/api
+#
+# The value must start with http:// or https:// and end with /api.
 guardian.api.baseUrl=
