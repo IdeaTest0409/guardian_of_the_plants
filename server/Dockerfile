@@ -8,6 +8,9 @@ RUN gradle --no-daemon bootJar
 FROM eclipse-temurin:17-jre
 
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /workspace/build/libs/*.jar /app/guardian-plants-server.jar
 
 EXPOSE 8080

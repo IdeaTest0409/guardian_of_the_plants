@@ -176,7 +176,7 @@ fun SettingsScreen(
             text = when (state.providerType) {
                 ProviderType.LOCAL -> "Current mode: Local / on-device"
                 ProviderType.CLOUD -> "Current mode: Cloud / LM Studio"
-                ProviderType.SERVER -> "Current mode: Server / VPS"
+                ProviderType.SERVER -> "Current mode: Server / VPS (recommended)"
             },
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -192,7 +192,7 @@ fun SettingsScreen(
                 state.providerType == ProviderType.CLOUD ->
                     "Cloud runtime: ${state.cloudBaseUrl.ifBlank { "unset" }} | ${state.cloudModel.ifBlank { "unset model" }}"
                 state.providerType == ProviderType.SERVER ->
-                    "Server VPS endpoint configured via local.properties"
+                    "Server runtime: endpoint configured via android/local.properties"
                 else -> "Runtime: unknown"
             },
             style = MaterialTheme.typography.bodySmall,
@@ -280,7 +280,7 @@ fun SettingsScreen(
             value = when (state.providerType) {
                 ProviderType.LOCAL -> "Local on-device"
                 ProviderType.CLOUD -> "Cloud LM Studio"
-                ProviderType.SERVER -> "Server VPS"
+                ProviderType.SERVER -> "Server VPS (recommended)"
             },
             expanded = providerMenuExpanded,
             onExpandedChange = { providerMenuExpanded = it },
@@ -301,7 +301,7 @@ fun SettingsScreen(
                 },
             )
             DropdownMenuItem(
-                text = { Text("Server VPS") },
+                text = { Text("Server VPS (recommended)") },
                 onClick = {
                     onProviderTypeChange(ProviderType.SERVER)
                     providerMenuExpanded = false
@@ -746,7 +746,7 @@ fun SettingsScreen(
         }
 
         if (state.providerType == ProviderType.SERVER) {
-            SectionLabel("Server VPS")
+            SectionLabel("Server VPS (recommended)")
             Text(
                 text = "AI requests are sent through your VPS server. The server handles AI provider selection and API keys. No configuration needed on this device.",
                 style = MaterialTheme.typography.bodyMedium,

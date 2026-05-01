@@ -1,5 +1,6 @@
 package com.example.guardianplants.controller;
 
+import com.example.guardianplants.ApiValidation;
 import com.example.guardianplants.dto.ChatRequest;
 import com.example.guardianplants.service.ChatService;
 import com.example.guardianplants.service.RequestTraceService;
@@ -9,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api")
@@ -24,6 +27,18 @@ public class ChatController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chat(@RequestBody ChatRequest request) {
+        var validationError = ApiValidation.validateChatRequest(request);
+        if (validationError.isPresent()) {
+            SseEmitter emitter = new SseEmitter(5_000L);
+            try {
+                emitter.send(SseEmitter.event().data("{\"error\":\"" + validationError.get() + "\"}"));
+            } catch (IOException ignored) {
+                // Client disconnected before validation error could be sent.
+            }
+            emitter.complete();
+            return emitter;
+        }
+
         String traceId = traceService.generateTraceId();
         String deviceId = request.deviceId() != null ? request.deviceId() : "unknown";
         String modelInfo = "device=" + deviceId;

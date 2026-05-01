@@ -1,5 +1,6 @@
 package com.example.guardianplants.controller;
 
+import com.example.guardianplants.ApiValidation;
 import com.example.guardianplants.dto.TtsRequest;
 import com.example.guardianplants.service.RequestTraceService;
 import com.example.guardianplants.service.TtsHealthService;
@@ -35,9 +36,10 @@ public class TtsController {
 
     @PostMapping(value = "/synthesize", produces = "audio/wav")
     public ResponseEntity<?> synthesize(@RequestBody TtsRequest request) {
-        if (request.text() == null || request.text().isBlank()) {
+        var validationError = ApiValidation.validateTtsRequest(request);
+        if (validationError.isPresent()) {
             return ResponseEntity.badRequest()
-                .body(Map.of("error", "Text is required"));
+                .body(Map.of("error", validationError.get()));
         }
 
         String traceId = traceService.generateTraceId();

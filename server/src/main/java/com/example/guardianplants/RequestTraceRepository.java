@@ -27,6 +27,26 @@ public class RequestTraceRepository {
         );
     }
 
+    public int pruneOldTraces(int retentionDays, int maxRows) {
+        int deletedByAge = jdbcTemplate.update(
+            "DELETE FROM request_traces WHERE created_at < NOW() - (? || ' days')::INTERVAL",
+            retentionDays
+        );
+        int deletedByCount = jdbcTemplate.update(
+            """
+            DELETE FROM request_traces
+            WHERE id IN (
+                SELECT id
+                FROM request_traces
+                ORDER BY created_at DESC
+                OFFSET ?
+            )
+            """,
+            maxRows
+        );
+        return deletedByAge + deletedByCount;
+    }
+
     public List<Map<String, Object>> getLatestFlows(int limit) {
         return jdbcTemplate.queryForList(
             """

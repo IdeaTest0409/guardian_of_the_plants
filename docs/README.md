@@ -1,36 +1,42 @@
-# Project docs
+# Project Docs
 
 Use these documents by purpose:
 
 ```text
-development-status.md   Current milestone status, architecture, and next steps.
-android-build.md        Build the Android APK.
-android-migration-list.md Historical Android migration notes.
-local-api-smoke-test.md Local Docker/nginx/server/db smoke test.
-vps-smoke-test.md       Ubuntu VPS deployment and smoke test.
-opencode-handoff.md     Broad project handoff and current status.
+development-status.md      Current milestone status, architecture, and next steps.
+android-build.md           Build the Android APK.
+android-migration-list.md  Historical Android migration notes.
+local-api-smoke-test.md    Local Docker/nginx/server/db smoke test.
+vps-smoke-test.md          Ubuntu VPS deployment smoke test.
+vps-operations.md          VPS operations, updates, logs, and backup notes.
+https-tls-plan.md          HTTPS/TLS plan for nginx on the VPS.
+opencode-handoff.md        Broad project handoff and current status.
+session-change-log.md      Session-level implementation history.
 ```
 
-Current verified milestone:
+Current verified path:
 
 ```text
-Android app with VoiceVox TTS toggle (SERVER provider only)
+Android app
   -> VPS nginx
-    -> server container
-      -> PostgreSQL container (app_logs, chat_histories, request_traces)
-      -> VoiceVOX Engine (3 speakers)
-  -> /admin/logs.html (browser log viewer with health status, auto-refresh, request flow tracking)
+    -> Spring Boot server container
+      -> PostgreSQL container
+        -> app_logs
+        -> chat_histories
+        -> request_traces
+      -> VoiceVOX Engine container
+      -> external AI provider
+  -> /admin/logs.html
 ```
 
-Request Flow Tracing (Milestone 6):
+Request flow tracing:
+
 ```text
-Every request gets a trace_id. Pipeline steps tracked:
-  Chat: received → ai_call → ai_response → db_saved → complete/error
-  TTS:  received → voicevox_call → voicevox_response → complete/error
-GET /api/logs/flow — recent flows
-GET /api/logs/flow/{traceId} — detailed steps
+Chat: received -> ai_call -> ai_response -> db_saved -> complete/error
+TTS:  received -> voicevox_call -> voicevox_response -> complete/error
+GET /api/logs/flow           recent flows
+GET /api/logs/flow/{traceId} detailed steps
 ```
 
-All development from Milestone 2 onward was done with **OpenCode** ([opencode.ai](https://opencode.ai)), an AI-powered CLI coding assistant.
-
-See `development-status.md` for the full milestone list, architecture, and next steps.
+The next major operational tasks are HTTPS/TLS, admin viewer authentication,
+rate limiting, and production-safe secret management.

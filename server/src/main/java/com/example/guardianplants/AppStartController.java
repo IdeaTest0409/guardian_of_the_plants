@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,7 +29,10 @@ public class AppStartController {
     }
 
     @PostMapping("/app-start")
-    public Map<String, Object> appStart(@RequestBody AppStartRequest request) throws JsonProcessingException {
+    public ResponseEntity<Map<String, Object>> appStart(@RequestBody AppStartRequest request) throws JsonProcessingException {
+        if (request == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Request body is required"));
+        }
         String detailsJson = objectMapper.writeValueAsString(
             Map.of(
                 "event", "app_start",
@@ -58,9 +62,9 @@ public class AppStartController {
             OffsetDateTime.now()
         );
 
-        return Map.of(
+        return ResponseEntity.ok(Map.of(
             "status", "stored",
             "id", id
-        );
+        ));
     }
 }

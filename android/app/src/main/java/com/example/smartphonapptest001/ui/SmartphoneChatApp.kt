@@ -359,22 +359,35 @@ private fun GuardianReplySpeechEffect(
                         tempFile.writeBytes(wavData)
                         mp = android.media.MediaPlayer()
                         mp.setDataSource(tempFile.absolutePath)
-                        mp.prepare()
                         mp.setOnCompletionListener {
-                            mp.release()
+                            runCatching { it.release() }
                             runCatching { tempFile.delete() }
                         }
-                        mp.setOnErrorListener { _, _, _ ->
-                            mp.release()
+                        mp.setOnErrorListener { player, what, extra ->
+                            runCatching { player.release() }
                             runCatching { tempFile.delete() }
+                            appLogger.log(
+                                AppLogSeverity.ERROR,
+                                "VoiceVox",
+                                "VoiceVox playback error",
+                                details = "what=$what extra=$extra file=${tempFile.name}",
+                            )
                             true
                         }
+                        mp.prepare()
                         mp.start()
                     } catch (e: Exception) {
-                        mp?.release()
+                        runCatching { mp?.release() }
                         runCatching { tempFile.delete() }
                         throw e
                     }
+                } else {
+                    appLogger.log(
+                        AppLogSeverity.WARN,
+                        "VoiceVox",
+                        "VoiceVox returned empty audio",
+                        details = "messageId=${message.id}",
+                    )
                 }
                 lastSpokenMessageId.value = message.id
             }.onFailure { error ->

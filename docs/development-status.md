@@ -1,211 +1,210 @@
 # Development Status: guardian_of_the_plants
 
-Last updated: 2026-05-01 (Request Flow Tracing + TTS Android Fix)
+Last updated: 2026-05-01
 
-## Development Tools
+## Current Summary
 
-This project is actively developed using **OpenCode** ([opencode.ai](https://opencode.ai)), an AI-powered CLI coding assistant. All milestones from Milestone 2 onward were implemented with opencode's assistance.
-
-## Completed Milestones
-
-### Milestone 1: App Start Logging (Done)
-
-```text
-Android app sends one log entry.
-Spring Boot receives it.
-PostgreSQL app_logs stores it.
-The Android app still works even if the server is unavailable.
-```
-
-### Milestone 2: Server-Side Chat API (Done - with opencode)
-
-```text
-Android app sends chat messages to /api/chat via SSE.
-Spring Boot proxies to AI provider (Ollama Cloud / configured provider).
-SSE stream flows: AI provider -> server -> Android.
-PostgreSQL chat_histories stores user + assistant messages.
-No AI API keys on the Android device.
-Provider selection is server-side (.env).
-Android ProviderType.SERVER routes through VPS.
-Existing LOCAL / CLOUD / OLLAMA_CLOUD providers remain functional.
-```
-
-Key files:
-- `server/src/main/java/com/example/guardianplants/controller/ChatController.java`
-- `server/src/main/java/com/example/guardianplants/service/ChatService.java`
-- `server/src/main/java/com/example/guardianplants/service/ProviderResolver.java`
-- `server/src/main/java/com/example/guardianplants/dto/ChatRequest.java`
-
-### Milestone 3: Server-Side VoiceVOX TTS (Done - with opencode)
-
-```text
-Server exposes POST /api/tts/synthesize for VoiceVOX text-to-speech.
-POST /api/tts/synthesize accepts { text, speaker } and returns WAV audio.
-GET /api/tts/speakers lists available VoiceVOX speakers.
-VoiceVOX Engine runs as a Docker container (default start, no profile needed).
-VOICEVOX_ENABLED in .env controls TTS availability.
-nginx /api/ proxy covers both /api/chat and /api/tts.
-```
-
-Key files:
-- `server/src/main/java/com/example/guardianplants/controller/TtsController.java`
-- `server/src/main/java/com/example/guardianplants/service/TtsService.java`
-- `server/src/main/java/com/example/guardianplants/service/TtsHealthService.java`
-- `server/src/main/java/com/example/guardianplants/config/VoiceVoxConfig.java`
-
-### Milestone 4: Browser Log Viewer (Done - with opencode)
-
-```text
-GET /api/logs/chat returns recent chat history from PostgreSQL.
-GET /api/logs/app returns recent app logs from PostgreSQL.
-GET /api/logs/health returns server/DB status, log counts, error counts, VoiceVOX health.
-/admin/logs.html serves a browser UI with health status bar, Chat History table, and App Logs table.
-Each section has a Refresh button. Auto-refresh every 30 seconds.
-ERROR rows highlighted in red. WARN/INFO severity color-coded.
-Mobile-friendly responsive design. No authentication required (dashboard mode).
-```
-
-Key files:
-- `server/src/main/java/com/example/guardianplants/controller/LogViewerController.java`
-- `server/src/main/java/com/example/guardianplants/LogViewerRepository.java`
-- `server/src/main/resources/static/admin/logs.html`
-
-### Milestone 5: Android VoiceVox Integration (Done - with opencode)
-
-```text
-Android app offers toggle between device TextToSpeech and server VoiceVox TTS.
-VoiceVox toggle visible only when ProviderType.SERVER is selected.
-3 selectable VoiceVox speakers: 四国めたん (2), ずんだもん (3), 春日部つむぎ (8).
-Settings saved via DataStore (voicevox_enabled, voicevox_speaker).
-GuardianReplySpeechEffect routes to ServerTtsApi when VoiceVox is enabled.
-ServerTtsApi downloads WAV via POST /api/tts/synthesize, plays with MediaPlayer.
-VoiceVox disabled → falls back to Android TextToSpeech.
-Build compiles cleanly (warnings only, no errors).
-```
-
-Key files created:
-- `android/app/src/main/java/com/example/smartphonapptest001/data/model/VoiceVoxSpeaker.kt`
-- `android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerTtsApi.kt`
-
-Key files modified:
-- `android/app/src/main/java/com/example/smartphonapptest001/data/model/AppSettings.kt` — added `voiceVoxEnabled`, `voiceVoxSpeaker`
-- `android/app/src/main/java/com/example/smartphonapptest001/data/SettingsRepository.kt` — persistence keys + parser
-- `android/app/src/main/java/com/example/smartphonapptest001/viewmodel/SettingsViewModel.kt` — UI state + handlers
-- `android/app/src/main/java/com/example/smartphonapptest001/ui/screen/SettingsScreen.kt` — toggle + speaker dropdown (SERVER only)
-- `android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt` — VoiceVox routing in speech effect
-- `android/app/src/main/java/com/example/smartphonapptest001/MainActivity.kt` — callback wiring
-
-Bug fixes during this milestone:
-- `ServerTtsApi.kt` — OkHttp `toMediaType` / `toRequestBody` API usage fixed
-- `ServerChatRequest.kt` — `Map<String, Any>` → `Map<String, JsonElement>` (kotlinx.serialization)
-- `ServerChatApi.kt` — Ktor `readUTF8Line(Int.MAX_VALUE)` + `toJsonElement` helper
-
-### Milestone 6: Request Flow Tracing (Done - with opencode)
-
-```text
-Every chat and TTS request gets a unique trace_id at server entry point.
-Each pipeline step is recorded in request_traces table: received → ai_call → ai_response → db_saved → complete
-Errors are captured with context: which step failed, error message, timing.
-GET /api/logs/flow returns recent request flows with step progression.
-GET /api/logs/flow/{traceId} returns detailed steps for a specific trace.
-/admin/logs.html shows Request Flow section with card-based UI.
-Flow cards show step-by-step progress with color coding (green=ok, red=error, gray=pending).
-Status bar includes flow error count and total trace count.
-```
-
-Key files created:
-- `server/src/main/java/com/example/guardianplants/RequestTraceRepository.java`
-- `server/src/main/java/com/example/guardianplants/service/RequestTraceService.java`
-- `db/init/002_request_traces.sql`
-
-Key files modified:
-- `server/src/main/java/com/example/guardianplants/controller/ChatController.java` — trace_id generation on entry
-- `server/src/main/java/com/example/guardianplants/service/ChatService.java` — AI call/response/DB save/error tracing
-- `server/src/main/java/com/example/guardianplants/controller/TtsController.java` — trace_id generation on entry
-- `server/src/main/java/com/example/guardianplants/controller/LogViewerController.java` — /api/logs/flow endpoints
-- `server/src/main/resources/static/admin/logs.html` — Request Flow UI section
-
-### Milestone 7: TTS Android Fixes (Done - with opencode)
-
-```text
-ServerTtsApi.kt readTimeout increased from 60s to 120s to handle long TTS generation.
-Added writeTimeout 30s for request body upload.
-GuardianReplySpeechEffect MediaPlayer resource leak fixed:
-  prepare() failure now properly releases MediaPlayer and deletes temp WAV file.
-  try-catch ensures cleanup even on unexpected exceptions.
-```
-
-Key files modified:
-- `android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerTtsApi.kt` — timeout tuning
-- `android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt` — MediaPlayer leak fix
-
-## Current Architecture
+The project has moved beyond the initial app-start logging milestone. The
+current development baseline is:
 
 ```text
 Android app (Jetpack Compose)
-  -> VPS nginx (HTTPS planned)
-    -> Spring Boot server (Java 17)
-      -> PostgreSQL (chat_histories, app_logs, request_traces)
-      -> VoiceVOX Engine (Docker, configurable)
-      -> external AI / Ollama Cloud
-  -> Browser: /admin/logs.html (dashboard, no auth, request flow tracking)
+  -> VPS nginx (HTTP today, HTTPS planned)
+    -> Spring Boot server container
+      -> PostgreSQL container
+      -> VoiceVOX Engine container
+      -> external AI provider
+  -> Browser admin viewer at /admin/logs.html
 ```
 
-## VPS Deployment
+Android defaults to the `SERVER` provider. The VPS server owns the AI provider
+configuration so Android no longer needs an AI API key for server-routed chat.
 
-- Server IP: `80.241.214.154` (configured in `android/local.properties`)
-- Endpoint: `http://80.241.214.154/api/`
-- Services: nginx, server, db, voicevox (all running via docker-compose)
-- Setup script: `setup-env.sh`
+## Completed Milestones
 
-## Build Commands
+### Milestone 1: App Start Logging
 
-### Android APK
-```powershell
-cd C:\work\guardian_of_the_plants\android
-$env:JAVA_HOME="C:\Program Files\Android\Android Studio1\jbr"
-$env:PATH="$env:JAVA_HOME\bin;$env:PATH"
-.\gradlew.bat :app:compileDebugKotlin
-.\gradlew.bat :app:assembleDebug
+```text
+Android app start -> nginx -> Spring Boot -> PostgreSQL app_logs
 ```
 
-### Server (Docker)
-```powershell
-cd C:\work\guardian_of_the_plants
-docker compose up -d --build db server nginx
+Verified with a physical Xiaomi device.
+
+### Milestone 2: Server-Side Chat API
+
+```text
+Android ProviderType.SERVER sends chat messages to POST /api/chat.
+Spring Boot forwards the request to the configured AI provider.
+SSE streams back to Android.
+chat_histories stores user and assistant messages.
+AI provider configuration lives in server .env.
 ```
+
+Important files:
+
+```text
+server/src/main/java/com/example/guardianplants/controller/ChatController.java
+server/src/main/java/com/example/guardianplants/service/ChatService.java
+server/src/main/java/com/example/guardianplants/service/ProviderResolver.java
+server/src/main/java/com/example/guardianplants/dto/ChatRequest.java
+android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatApi.kt
+```
+
+### Milestone 3: Server-Side VoiceVOX TTS
+
+```text
+POST /api/tts/synthesize returns WAV audio.
+GET /api/tts/speakers returns VoiceVOX speaker data.
+VoiceVOX Engine runs through Docker Compose.
+VOICEVOX_ENABLED controls server-side availability.
+```
+
+Android can use server VoiceVOX TTS when ProviderType.SERVER is selected.
+
+Current Android speaker choices:
+
+```text
+四国めたん    speaker=2
+ずんだもん    speaker=3
+春日部つむぎ  speaker=8
+```
+
+### Milestone 4: Browser Log Viewer
+
+The VPS serves a dashboard at:
+
+```text
+/admin/logs.html
+```
+
+Current capabilities:
+
+```text
+GET /api/logs/chat
+GET /api/logs/app
+GET /api/logs/health
+GET /api/logs/download
+```
+
+The page shows chat history, app logs, health status, and request flow data. It
+currently has no authentication.
+
+### Milestone 5: Android VoiceVOX Integration
+
+Android settings include a server VoiceVOX toggle only for `SERVER` provider.
+When enabled, assistant replies are synthesized by the VPS through
+`POST /api/tts/synthesize`. If disabled, Android TextToSpeech is used.
+
+### Milestone 6: Request Flow Tracing
+
+Every chat and TTS request receives a `trace_id`.
+
+Pipeline steps:
+
+```text
+Chat: received -> ai_call -> ai_response -> db_saved -> complete/error
+TTS:  received -> voicevox_call -> voicevox_response -> complete/error
+```
+
+Endpoints:
+
+```text
+GET /api/logs/flow
+GET /api/logs/flow/{traceId}
+```
+
+Storage:
+
+```text
+request_traces
+```
+
+Current retention guard:
+
+```text
+prune every 200 inserted steps
+keep at most 10,000 rows
+delete rows older than 7 days
+```
+
+### Milestone 7: Android TTS Fixes
+
+`ServerTtsApi` timeout handling was extended for long VoiceVOX generation.
+MediaPlayer cleanup now releases resources and deletes temporary WAV files on
+completion, error, and prepare/start exceptions.
+
+## Current Docker Services
+
+```text
+nginx     externally published on NGINX_HTTP_PORT, default 80
+server    internal only
+db        internal only
+voicevox  internal only
+```
+
+Only nginx should be exposed to the network.
+
+## Current Database Tables
+
+```text
+app_logs
+chat_histories
+request_traces
+```
+
+Initial SQL:
+
+```text
+db/init/001_init.sql
+db/init/002_request_traces.sql
+```
+
+Note: SQL files in `db/init` only run when PostgreSQL initializes a new volume.
+For an existing VPS volume, apply schema changes manually or introduce a real
+migration tool later.
+
+## Configuration
+
+Server-side `.env`:
+
+```text
+POSTGRES_DB
+POSTGRES_USER
+POSTGRES_PASSWORD
+AI_BASE_URL
+AI_API_KEY
+AI_MODEL
+VOICEVOX_ENABLED
+VOICEVOX_BASE_URL
+```
+
+Android local build configuration:
+
+```text
+android/local.properties
+guardian.api.baseUrl=http://<SERVER_HOST>/api
+```
+
+`android/local.properties` is intentionally ignored by Git.
 
 ## Known Risks
 
 | Risk | Status | Mitigation |
 |------|--------|------------|
-| Secrets in `.env` | Manual | Never commit `.env` |
+| VPS still uses HTTP | Open | Add HTTPS/TLS through nginx |
+| `/admin/logs.html` has no auth | Open | Add Basic Auth or token gate |
+| TTS CPU load | Expected | Keep `VOICEVOX_ENABLED=false` when not needed; add rate limiting |
+| Request trace growth | Partially handled | Retention guard added; consider scheduled cleanup |
+| `db/init` is not migration tooling | Open | Add Flyway/Liquibase or manual migration docs |
 | Android Filament native crashes | Known | 3D expression off by default |
-| VoiceVOX CPU load | Expected | `VOICEVOX_ENABLED=false` to disable |
-| VPS nginx HTTP (no TLS) | Planned | HTTPS/TLS next milestone |
-| `local.properties` machine-specific | Info | SDK path set for `tomok`'s machine |
+| Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
 
 ## Next Steps
 
-1. Build release APK and test VoiceVox toggle on physical device (Xiaomi 2602BPC18G)
-2. Add HTTPS/TLS to VPS nginx (Let's Encrypt)
-3. Add server-side rate limiting for `/api/tts/synthesize`
-4. Consider async TTS job queue for high-latency scenarios
-5. Move RAG/knowledge management server-side
-6. Add browser log viewer auth (basic auth or token)
-7. Verify request_traces table auto-created via Docker init script
-
-## Git State
-
-```text
-Repository: https://github.com/IdeaTest0409/guardian_of_the_plants.git
-Branch: main
-Working directory: C:\work\guardian_of_the_plants
-```
-
-All changes should be committed and pushed after verification:
-```powershell
-git add .
-git commit -m "Describe change"
-git push
-```
+1. Add HTTPS/TLS to nginx on the VPS.
+2. Add authentication for `/admin/logs.html`.
+3. Add rate limiting for `/api/chat` and `/api/tts/synthesize`.
+4. Decide whether to keep `CLOUD` provider visible in Android or mark it legacy.
+5. Add a proper DB migration workflow.
+6. Consider async TTS jobs if VoiceVOX latency becomes a problem.
+7. Move RAG/knowledge management server-side.
