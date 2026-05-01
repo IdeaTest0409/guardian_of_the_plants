@@ -45,19 +45,34 @@ public class TtsController {
         }
 
         String traceId = traceService.generateTraceId();
-        traceService.recordReceived(traceId, "tts", "speaker=" + request.speaker() + " text=" + request.text().substring(0, Math.min(50, request.text().length())));
+        String format = normalizeFormat(request.format());
+        traceService.recordReceived(traceId, "tts", "speaker=" + request.speaker() + " format=" + format + " text=" + request.text().substring(0, Math.min(50, request.text().length())));
 
         long startTime = System.currentTimeMillis();
         try {
             traceService.recordVoiceVoxCall(traceId, request.speaker());
             byte[] wavData = ttsService.synthesize(request.text(), request.speaker());
-            long duration = System.currentTimeMillis() - startTime;
-            traceService.recordVoiceVoxResponse(traceId, wavData.length, duration);
+            long voiceVoxDuration = System.currentTimeMillis() - startTime;
+            traceService.recordVoiceVoxResponse(traceId, wavData.length, voiceVoxDuration);
+            byte[] responseData = wavData;
+            String contentType = "audio/wav";
+            String extension = "wav";
+            if ("aac".equals(format)) {
+                long encodeStart = System.currentTimeMillis();
+                var encoded = ttsService.encodeAac(wavData);
+                long encodeDuration = System.currentTimeMillis() - encodeStart;
+                responseData = encoded.data();
+                contentType = encoded.contentType();
+                extension = encoded.extension();
+                traceService.recordAudioEncode(traceId, encoded.format(), responseData.length, encodeDuration);
+            }
             traceService.recordComplete(traceId, "tts");
             return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_TYPE, "audio/wav")
-                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(wavData.length))
-                .body(wavData);
+                .header(HttpHeaders.CONTENT_TYPE, contentType)
+                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(responseData.length))
+                .header("X-Audio-Format", format)
+                .header("X-Audio-Extension", extension)
+                .body(responseData);
         } catch (IllegalStateException e) {
             log.warn("TTS request when disabled");
             traceService.recordError(traceId, "tts", "voicevox_call", "TTS disabled");
@@ -71,6 +86,13 @@ public class TtsController {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("error", "VoiceVOX unavailable: " + e.getMessage()));
         }
+    }
+
+    private String normalizeFormat(String format) {
+        if (format == null || format.isBlank()) {
+            return "wav";
+        }
+        return format.trim().toLowerCase();
     }
 
     @GetMapping("/speakers")

@@ -55,6 +55,12 @@ public final class ApiValidation {
         if (request.speaker() < MIN_VOICEVOX_SPEAKER || request.speaker() > MAX_VOICEVOX_SPEAKER) {
             return Optional.of("speaker is out of range");
         }
+        if (request.format() != null && !request.format().isBlank()) {
+            String format = request.format().trim().toLowerCase();
+            if (!format.equals("wav") && !format.equals("aac")) {
+                return Optional.of("format must be wav or aac");
+            }
+        }
         return Optional.empty();
     }
 }

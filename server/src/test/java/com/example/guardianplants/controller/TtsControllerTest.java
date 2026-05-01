@@ -67,6 +67,32 @@ class TtsControllerTest {
     }
 
     @Test
+    void synthesizeReturnsAacWhenRequested() throws Exception {
+        when(traceService.generateTraceId()).thenReturn("trace-test");
+        when(ttsService.synthesize(anyString(), anyInt())).thenReturn(new byte[] {1, 2, 3});
+        when(ttsService.encodeAac(new byte[] {1, 2, 3}))
+            .thenReturn(new TtsService.EncodedAudio(new byte[] {4, 5}, "audio/mp4", "m4a", "aac"));
+
+        mockMvc.perform(post("/api/tts/synthesize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\":\"hello\",\"speaker\":3,\"format\":\"aac\"}"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "audio/mp4"))
+            .andExpect(header().string("X-Audio-Format", "aac"))
+            .andExpect(header().string("X-Audio-Extension", "m4a"))
+            .andExpect(content().bytes(new byte[] {4, 5}));
+    }
+
+    @Test
+    void synthesizeRejectsInvalidFormat() throws Exception {
+        mockMvc.perform(post("/api/tts/synthesize")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"text\":\"hello\",\"speaker\":3,\"format\":\"mp3\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error", is("format must be wav or aac")));
+    }
+
+    @Test
     void synthesizeReturnsJsonWhenVoiceVoxFails() throws Exception {
         when(traceService.generateTraceId()).thenReturn("trace-test");
         when(ttsService.synthesize(anyString(), anyInt()))

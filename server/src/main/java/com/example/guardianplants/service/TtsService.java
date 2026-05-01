@@ -9,6 +9,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
+
 @Service
 public class TtsService {
 
@@ -54,6 +59,57 @@ public class TtsService {
         }
     }
 
+    public EncodedAudio encodeAac(byte[] wavData) {
+        Path wavFile = null;
+        Path m4aFile = null;
+        try {
+            wavFile = Files.createTempFile("guardian-tts-", ".wav");
+            m4aFile = Files.createTempFile("guardian-tts-", ".m4a");
+            Files.write(wavFile, wavData);
+
+            Process process = new ProcessBuilder(
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel", "error",
+                "-y",
+                "-i", wavFile.toAbsolutePath().toString(),
+                "-c:a", "aac",
+                "-b:a", "64k",
+                "-movflags", "+faststart",
+                m4aFile.toAbsolutePath().toString()
+            ).redirectErrorStream(true).start();
+
+            boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new RuntimeException("AAC encode timed out");
+            }
+            if (process.exitValue() != 0) {
+                String output = new String(process.getInputStream().readAllBytes());
+                throw new RuntimeException("AAC encode failed: " + output);
+            }
+            return new EncodedAudio(Files.readAllBytes(m4aFile), "audio/mp4", "m4a", "aac");
+        } catch (IOException e) {
+            throw new RuntimeException("AAC encode failed: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("AAC encode interrupted", e);
+        } finally {
+            deleteIfExists(wavFile);
+            deleteIfExists(m4aFile);
+        }
+    }
+
+    private void deleteIfExists(Path path) {
+        if (path != null) {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                log.debug("Failed to delete temp audio file {}", path, e);
+            }
+        }
+    }
+
     public String getSpeakers() {
         if (!config.isEnabled()) {
             throw new IllegalStateException("TTS is disabled");
@@ -69,5 +125,8 @@ public class TtsService {
             log.error("VoiceVOX speakers API error: {}", e.getStatusCode());
             throw new RuntimeException("Failed to fetch speakers: " + e.getMessage(), e);
         }
+    }
+
+    public record EncodedAudio(byte[] data, String contentType, String extension, String format) {
     }
 }

@@ -353,12 +353,12 @@ private fun GuardianReplySpeechEffect(
                 },
             )
             runCatching {
-                val wavData = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId)
-                if (wavData != null && wavData.isNotEmpty()) {
-                    val tempFile = java.io.File.createTempFile("voicevox_tts_", ".wav", context.cacheDir)
+                val audio = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId)
+                if (audio != null && audio.bytes.isNotEmpty()) {
+                    val tempFile = java.io.File.createTempFile("voicevox_tts_", ".${audio.extension}", context.cacheDir)
                     var mp: android.media.MediaPlayer? = null
                     try {
-                        tempFile.writeBytes(wavData)
+                        tempFile.writeBytes(audio.bytes)
                         mp = android.media.MediaPlayer()
                         mp.setDataSource(tempFile.absolutePath)
                         mp.setOnCompletionListener {
@@ -372,7 +372,7 @@ private fun GuardianReplySpeechEffect(
                                 AppLogSeverity.ERROR,
                                 "VoiceVox",
                                 "VoiceVox playback error",
-                                details = "what=$what extra=$extra file=${tempFile.name}",
+                                details = "what=$what extra=$extra format=${audio.format} file=${tempFile.name}",
                             )
                             true
                         }

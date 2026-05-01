@@ -5,6 +5,42 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Server VoiceVOX AAC Output Option
+
+Added optional AAC/M4A output for server-routed VoiceVOX TTS while keeping WAV
+as the compatible fallback path.
+
+Behavior:
+
+```text
+Android requests format=aac from POST /api/tts/synthesize.
+The server still asks VoiceVOX for WAV.
+When AAC is requested, the server converts WAV to M4A/AAC with ffmpeg.
+Android stores the response as .m4a for MediaPlayer playback.
+If AAC synthesis fails on Android, it retries once with format=wav.
+```
+
+Tracing:
+
+```text
+voicevox_response records WAV bytes and VoiceVOX duration.
+audio_encode records AAC bytes and encode duration.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/dto/TtsRequest.java
+server/src/main/java/com/example/guardianplants/ApiValidation.java
+server/src/main/java/com/example/guardianplants/service/TtsService.java
+server/src/main/java/com/example/guardianplants/service/RequestTraceService.java
+server/src/main/java/com/example/guardianplants/controller/TtsController.java
+server/src/test/java/com/example/guardianplants/controller/TtsControllerTest.java
+server/Dockerfile
+android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerTtsApi.kt
+android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt
+```
+
 ### Android Approved Plant Image Reuse
 
 Added a chat-screen switch to skip repeated hidden image diagnostics after the

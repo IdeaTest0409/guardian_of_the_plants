@@ -17,7 +17,7 @@ ENV GIT_COMMIT=${GIT_COMMIT}
 ENV BUILD_TIME=${BUILD_TIME}
 ENV APP_ENV=${APP_ENV}
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /workspace/build/libs/*.jar /app/guardian-plants-server.jar
 

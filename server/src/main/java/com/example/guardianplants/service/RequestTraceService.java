@@ -47,6 +47,10 @@ public class RequestTraceService {
         insertStep(traceId, "tts", "voicevox_response", "ok", sizeBytes + " bytes", (int) durationMs);
     }
 
+    public void recordAudioEncode(String traceId, String format, int sizeBytes, long durationMs) {
+        insertStep(traceId, "tts", "audio_encode", "ok", "format=" + format + " " + sizeBytes + " bytes", (int) durationMs);
+    }
+
     public void recordComplete(String traceId, String requestType) {
         insertStep(traceId, requestType, "complete", "ok", null, null);
     }

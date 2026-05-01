@@ -20,7 +20,12 @@ class ServerTtsApi(
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    suspend fun synthesize(text: String, speakerId: Int): ByteArray? {
+    suspend fun synthesize(text: String, speakerId: Int, preferredFormat: String = "aac"): AudioResult? {
+        return synthesizeOnce(text, speakerId, preferredFormat)
+            ?: if (preferredFormat != "wav") synthesizeOnce(text, speakerId, "wav") else null
+    }
+
+    private suspend fun synthesizeOnce(text: String, speakerId: Int, format: String): AudioResult? {
         val normalizedUrl = baseUrl.trim().trimEnd('/')
         if (normalizedUrl.isBlank()) {
             logger.log(AppLogSeverity.ERROR, TAG, "TTS base URL is not configured")
@@ -31,7 +36,7 @@ class ServerTtsApi(
 
         return withContext(Dispatchers.IO) {
             try {
-                val jsonBody = """{"text":"${escapeJson(text)}","speaker":$speakerId}"""
+                val jsonBody = """{"text":"${escapeJson(text)}","speaker":$speakerId,"format":"${escapeJson(format)}"}"""
                 val mediaType = "application/json; charset=utf-8".toMediaType()
                 val requestBody = jsonBody.toRequestBody(mediaType)
                 val request = Request.Builder()
@@ -41,7 +46,7 @@ class ServerTtsApi(
 
                 logger.log(
                     AppLogSeverity.INFO, TAG, "TTS request started",
-                    details = "url=$fullUrl, text=${text.take(50)}, speaker=$speakerId",
+                    details = "url=$fullUrl, text=${text.take(50)}, speaker=$speakerId, format=$format",
                 )
 
                 client.newCall(request).execute().use { response ->
@@ -49,18 +54,26 @@ class ServerTtsApi(
                         val errorBody = response.body?.string().orEmpty()
                         logger.log(
                             AppLogSeverity.ERROR, TAG, "TTS synthesis failed",
-                            details = "url=$fullUrl, status=${response.code}, body=$errorBody",
+                            details = "url=$fullUrl, status=${response.code}, format=$format, body=$errorBody",
                         )
                         return@withContext null
                     }
-                    val wavData = response.body?.bytes()
-                    if (wavData != null && wavData.isNotEmpty()) {
+                    val audioData = response.body?.bytes()
+                    if (audioData != null && audioData.isNotEmpty()) {
+                        val responseFormat = response.header("X-Audio-Format")?.ifBlank { format } ?: format
+                        val extension = response.header("X-Audio-Extension")?.ifBlank { extensionFor(responseFormat) }
+                            ?: extensionFor(responseFormat)
                         logger.log(
                             AppLogSeverity.INFO, TAG, "TTS synthesis successful",
-                            details = "text=${text.take(50)}, speaker=$speakerId, size=${wavData.size} bytes",
+                            details = "text=${text.take(50)}, speaker=$speakerId, format=$responseFormat, size=${audioData.size} bytes",
+                        )
+                        return@withContext AudioResult(
+                            bytes = audioData,
+                            format = responseFormat,
+                            extension = extension,
                         )
                     }
-                    wavData
+                    null
                 }
             } catch (e: Exception) {
                 logger.log(
@@ -87,5 +100,17 @@ class ServerTtsApi(
 
     companion object {
         private const val TAG = "ServerTtsApi"
+
+        private fun extensionFor(format: String): String =
+            when (format.lowercase()) {
+                "aac" -> "m4a"
+                else -> "wav"
+            }
     }
 }
+
+data class AudioResult(
+    val bytes: ByteArray,
+    val format: String,
+    val extension: String,
+)
