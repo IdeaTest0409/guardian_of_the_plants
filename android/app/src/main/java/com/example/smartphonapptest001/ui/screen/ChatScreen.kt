@@ -514,7 +514,7 @@ private fun ApprovedPlantImageReuseToggle(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(34.dp),
+            .height(30.dp),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
     ) {
@@ -541,6 +541,10 @@ private fun ApprovedPlantImageReuseToggle(
                 checked = enabled && available,
                 onCheckedChange = onEnabledChange,
                 enabled = available,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = 0.78f
+                    scaleY = 0.78f
+                },
             )
         }
     }
@@ -659,18 +663,15 @@ private fun QuickReplyPresets(
         "今の季節大丈夫？",
         "植物は何と言っている？",
     )
-    Column(
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 30.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        presets.chunked(4).forEach { rowPresets ->
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                rowPresets.forEach { preset ->
-                    MiniPresetButton(text = preset, onClick = { onPresetTap(preset) })
-                }
-            }
+        presets.forEach { preset ->
+            MiniPresetButton(text = preset, onClick = { onPresetTap(preset) })
         }
     }
 }
@@ -690,7 +691,7 @@ private fun MiniPresetButton(
             )
         },
         modifier = Modifier
-            .height(24.dp),
+            .height(28.dp),
     )
 }
 

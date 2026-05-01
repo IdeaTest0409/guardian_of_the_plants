@@ -43,6 +43,7 @@ import com.example.smartphonapptest001.data.model.PlantSpecies
 import com.example.smartphonapptest001.data.model.ProviderType
 import com.example.smartphonapptest001.data.model.TtsVoiceProfile
 import com.example.smartphonapptest001.data.model.VoiceVoxSpeaker
+import com.example.smartphonapptest001.data.network.AudioResult
 import com.example.smartphonapptest001.data.network.ServerTtsApi
 import com.example.smartphonapptest001.ui.screen.ChatScreen
 import com.example.smartphonapptest001.ui.screen.LogsScreen
@@ -353,10 +354,11 @@ private fun GuardianReplySpeechEffect(
                 },
             )
             runCatching {
-                val audio = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId)
-                if (audio != null && audio.bytes.isNotEmpty()) {
+                suspend fun playAudio(audio: AudioResult): Boolean {
+                    if (audio.bytes.isEmpty()) return false
                     val tempFile = java.io.File.createTempFile("voicevox_tts_", ".${audio.extension}", context.cacheDir)
                     var mp: android.media.MediaPlayer? = null
+                    var immediatePlaybackError = false
                     try {
                         tempFile.writeBytes(audio.bytes)
                         mp = android.media.MediaPlayer()
@@ -366,6 +368,7 @@ private fun GuardianReplySpeechEffect(
                             runCatching { tempFile.delete() }
                         }
                         mp.setOnErrorListener { player, what, extra ->
+                            immediatePlaybackError = true
                             runCatching { player.release() }
                             runCatching { tempFile.delete() }
                             appLogger.log(
@@ -378,11 +381,39 @@ private fun GuardianReplySpeechEffect(
                         }
                         mp.prepare()
                         mp.start()
+                        kotlinx.coroutines.delay(250L)
+                        if (immediatePlaybackError) {
+                            throw IllegalStateException("MediaPlayer playback error for ${audio.format}")
+                        }
+                        appLogger.log(
+                            AppLogSeverity.INFO,
+                            "VoiceVox",
+                            "VoiceVox playback started",
+                            details = "messageId=${message.id} format=${audio.format} bytes=${audio.bytes.size} file=${tempFile.name}",
+                        )
+                        return true
                     } catch (e: Exception) {
                         runCatching { mp?.release() }
                         runCatching { tempFile.delete() }
-                        throw e
+                        appLogger.log(
+                            AppLogSeverity.WARN,
+                            "VoiceVox",
+                            "VoiceVox playback start failed",
+                            details = buildString {
+                                appendLine("messageId=${message.id}")
+                                appendLine("format=${audio.format}")
+                                appendLine("bytes=${audio.bytes.size}")
+                                appendLine("type=${e::class.java.simpleName}")
+                                appendLine("message=${e.message.orEmpty()}")
+                            },
+                        )
+                        return false
                     }
+                }
+
+                val audio = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId, preferredFormat = "aac")
+                val played = if (audio != null) {
+                    playAudio(audio)
                 } else {
                     appLogger.log(
                         AppLogSeverity.WARN,
@@ -390,8 +421,23 @@ private fun GuardianReplySpeechEffect(
                         "VoiceVox returned empty audio",
                         details = "messageId=${message.id}",
                     )
+                    false
                 }
-                lastSpokenMessageId.value = message.id
+                val fallbackPlayed = if (!played && audio?.format?.lowercase() != "wav") {
+                    appLogger.log(
+                        AppLogSeverity.INFO,
+                        "VoiceVox",
+                        "Retrying VoiceVox playback with WAV",
+                        details = "messageId=${message.id}",
+                    )
+                    val wavAudio = serverTtsApi.synthesize(speakText, voiceVoxSpeaker.speakerId, preferredFormat = "wav")
+                    wavAudio?.let { playAudio(it) } == true
+                } else {
+                    false
+                }
+                if (played || fallbackPlayed) {
+                    lastSpokenMessageId.value = message.id
+                }
             }.onFailure { error ->
                 appLogger.log(
                     AppLogSeverity.ERROR,

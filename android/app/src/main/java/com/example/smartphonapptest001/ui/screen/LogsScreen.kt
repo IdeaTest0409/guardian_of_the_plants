@@ -50,12 +50,12 @@ fun LogsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = "Execution Logs",
+            text = "Log View",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Error, request, response, and state change logs are stored locally and can be shared for debugging.",
+            text = "端末内のエラー、通信、状態変更ログを確認できます。不要になったログはまとめて削除できます。",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -63,11 +63,11 @@ fun LogsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip(
                 onClick = { },
-                label = { Text("Entries: ${entries.size}") },
+                label = { Text("ログ数: ${entries.size}") },
             )
             AssistChip(
                 onClick = { },
-                label = { Text("Errors: ${entries.count { it.severity == AppLogSeverity.ERROR }}") },
+                label = { Text("エラー: ${entries.count { it.severity == AppLogSeverity.ERROR }}") },
             )
         }
 
@@ -79,14 +79,14 @@ fun LogsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(imageVector = Icons.Outlined.Share, contentDescription = null)
-                Text("Share logs")
+                Text("ログを共有")
             }
             Button(
                 onClick = onClearLogs,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(imageVector = Icons.Outlined.DeleteForever, contentDescription = null)
-                Text("Clear logs")
+                Text("ログを全て削除する")
             }
         }
 
@@ -96,7 +96,7 @@ fun LogsScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No logs yet.",
+                    text = "ログはまだありません。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

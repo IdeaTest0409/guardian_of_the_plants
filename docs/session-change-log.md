@@ -5,6 +5,29 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Android Chat UI And Voice Playback Reliability
+
+Improved the Android chat screen for small phone heights and made VoiceVOX
+playback recover when AAC is downloaded but the device cannot start playback.
+
+Behavior:
+
+```text
+Quick reply buttons now stay in one horizontal scroll row.
+The approved-image reuse switch uses less vertical space.
+VoiceVOX playback tries AAC first.
+If Android MediaPlayer cannot start AAC playback, the app requests WAV and retries once.
+Log View exposes a Japanese "ログを全て削除する" button for clearing local logs.
+```
+
+Changed:
+
+```text
+android/app/src/main/java/com/example/smartphonapptest001/ui/screen/ChatScreen.kt
+android/app/src/main/java/com/example/smartphonapptest001/ui/SmartphoneChatApp.kt
+android/app/src/main/java/com/example/smartphonapptest001/ui/screen/LogsScreen.kt
+```
+
 ### Server VoiceVOX AAC Output Option
 
 Added optional AAC/M4A output for server-routed VoiceVOX TTS while keeping WAV
