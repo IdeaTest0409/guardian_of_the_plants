@@ -189,7 +189,12 @@ public class ChatService {
         body.put("stream", true);
 
         List<Map<String, Object>> messages = request.messages().stream()
-            .map(m -> Map.<String, Object>of("role", m.role(), "content", m.content()))
+            .map(m -> {
+                Map<String, Object> msg = new java.util.LinkedHashMap<>();
+                msg.put("role", m.role());
+                msg.put("content", normalizeContent(m.content()));
+                return msg;
+            })
             .toList();
         body.put("messages", messages);
 
@@ -210,5 +215,25 @@ public class ChatService {
         }
 
         return body;
+    }
+
+    /**
+     * 古いAPKから来た ["text", {...}] 形式を
+     * [{"type":"text","text":"..."}, {...}] 形式に変換
+     */
+    private Object normalizeContent(Object content) {
+        if (content instanceof List) {
+            List<?> list = (List<?>) content;
+            if (!list.isEmpty() && list.get(0) instanceof String) {
+                // 最初の要素が文字列の場合、正しい形式に変換
+                List<Object> normalized = new java.util.ArrayList<>();
+                normalized.add(Map.of("type", "text", "text", list.get(0).toString()));
+                for (int i = 1; i < list.size(); i++) {
+                    normalized.add(list.get(i));
+                }
+                return normalized;
+            }
+        }
+        return content;
     }
 }

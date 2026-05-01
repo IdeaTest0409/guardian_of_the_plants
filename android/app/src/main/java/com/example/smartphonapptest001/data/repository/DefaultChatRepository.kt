@@ -263,7 +263,12 @@ private fun List<ChatMessage>.toServerMessages(): List<ServerMessage> =
         } else {
             val contentArray = mutableListOf<kotlinx.serialization.json.JsonElement>()
             if (msg.content.isNotBlank()) {
-                contentArray.add(JsonPrimitive(msg.content))
+                contentArray.add(
+                    buildJsonObject {
+                        put("type", JsonPrimitive("text"))
+                        put("text", JsonPrimitive(msg.content))
+                    }
+                )
             }
             for (attachment in imageAttachments) {
                 contentArray.add(
