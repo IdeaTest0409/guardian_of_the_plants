@@ -2,6 +2,7 @@ package com.example.guardianplants.controller;
 
 import com.example.guardianplants.LogViewerRepository;
 import com.example.guardianplants.RequestTraceRepository;
+import com.example.guardianplants.ServerVersionInfo;
 import com.example.guardianplants.service.TtsHealthService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,27 +32,45 @@ public class LogViewerController {
     private final RequestTraceRepository requestTraceRepository;
     private final JdbcTemplate jdbcTemplate;
     private final TtsHealthService ttsHealthService;
+    private final ServerVersionInfo serverVersionInfo;
 
-    public LogViewerController(LogViewerRepository logViewerRepository, RequestTraceRepository requestTraceRepository, JdbcTemplate jdbcTemplate, TtsHealthService ttsHealthService) {
+    public LogViewerController(LogViewerRepository logViewerRepository, RequestTraceRepository requestTraceRepository, JdbcTemplate jdbcTemplate, TtsHealthService ttsHealthService, ServerVersionInfo serverVersionInfo) {
         this.logViewerRepository = logViewerRepository;
         this.requestTraceRepository = requestTraceRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.ttsHealthService = ttsHealthService;
+        this.serverVersionInfo = serverVersionInfo;
     }
 
     @GetMapping("/chat")
-    public List<Map<String, Object>> chatLogs(@RequestParam(defaultValue = "100") int limit) {
-        return logViewerRepository.getChatLogs(Math.min(limit, 500));
+    public List<Map<String, Object>> chatLogs(
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) Integer hours) {
+        int cappedLimit = Math.min(Math.max(limit, 1), 500);
+        if (hours == null) {
+            return logViewerRepository.getChatLogs(cappedLimit);
+        }
+        return logViewerRepository.getChatLogsSince(since(hours), cappedLimit);
     }
 
     @GetMapping("/app")
-    public List<Map<String, Object>> appLogs(@RequestParam(defaultValue = "100") int limit) {
-        return logViewerRepository.getAppLogs(Math.min(limit, 500));
+    public List<Map<String, Object>> appLogs(
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) Integer hours) {
+        int cappedLimit = Math.min(Math.max(limit, 1), 500);
+        if (hours == null) {
+            return logViewerRepository.getAppLogs(cappedLimit);
+        }
+        return logViewerRepository.getAppLogsSince(since(hours), cappedLimit);
     }
 
     @GetMapping("/flow")
-    public List<Map<String, Object>> requestFlows(@RequestParam(defaultValue = "50") int limit) {
-        return requestTraceRepository.getRecentTraces(Math.min(Math.max(limit, 1), 200));
+    public List<Map<String, Object>> requestFlows(
+            @RequestParam(defaultValue = "50") int limit,
+            @RequestParam(defaultValue = "6") int hours) {
+        return requestTraceRepository.getRecentTraces(cappedHours(hours)).stream()
+            .limit(Math.min(Math.max(limit, 1), 200))
+            .toList();
     }
 
     @GetMapping("/flow/{traceId}")
@@ -111,13 +130,17 @@ public class LogViewerController {
         return result;
     }
 
+    @GetMapping("/version")
+    public Map<String, Object> version() {
+        return serverVersionInfo.asMap();
+    }
+
     @GetMapping("/download")
     public ResponseEntity<String> downloadLogs(
             @RequestParam(defaultValue = "1") int hours,
             @RequestParam(defaultValue = "all") String type) {
         int cappedHours = Math.min(Math.max(hours, 1), 24);
-        OffsetDateTime since = Instant.now().minusSeconds(cappedHours * 3600L)
-            .atOffset(ZoneOffset.UTC);
+        OffsetDateTime since = since(cappedHours);
 
         StringBuilder sb = new StringBuilder();
         String nowStr = Instant.now().atZone(ZoneOffset.UTC).format(TS_FMT);
@@ -222,5 +245,14 @@ public class LogViewerController {
 
     private String safeStr(Object val) {
         return val != null ? val.toString() : "";
+    }
+
+    private OffsetDateTime since(int hours) {
+        return Instant.now().minusSeconds(cappedHours(hours) * 3600L)
+            .atOffset(ZoneOffset.UTC);
+    }
+
+    private int cappedHours(int hours) {
+        return Math.min(Math.max(hours, 1), 24);
     }
 }

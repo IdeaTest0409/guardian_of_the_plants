@@ -31,6 +31,23 @@ public class LogViewerRepository {
         );
     }
 
+    public List<Map<String, Object>> getChatLogsSince(OffsetDateTime since, int limit) {
+        return jdbcTemplate.queryForList(
+            """
+            SELECT id, created_at, device_id, conversation_id, role,
+                   left(content, 200) as content_preview,
+                   metadata->>'status' as status,
+                   metadata->>'model' as model
+            FROM chat_histories
+            WHERE created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            since,
+            limit
+        );
+    }
+
     public List<Map<String, Object>> getAppLogs(int limit) {
         return jdbcTemplate.queryForList(
             """
@@ -40,6 +57,21 @@ public class LogViewerRepository {
             ORDER BY received_at DESC
             LIMIT ?
             """,
+            limit
+        );
+    }
+
+    public List<Map<String, Object>> getAppLogsSince(OffsetDateTime since, int limit) {
+        return jdbcTemplate.queryForList(
+            """
+            SELECT id, received_at, device_id, app_version, severity,
+                   category, left(message, 200) as message_preview
+            FROM app_logs
+            WHERE received_at >= ?
+            ORDER BY received_at DESC
+            LIMIT ?
+            """,
+            since,
             limit
         );
     }
