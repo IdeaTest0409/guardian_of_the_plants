@@ -380,9 +380,12 @@
                 parseInt(document.getElementById('flow-hours')?.value || '1')
             );
             fetch('/api/logs/download?hours=' + hours + '&type=all')
-                .then(r => {
-                    if (!r.ok) throw new Error('Download failed');
-                    return r.text();
+                .then(async r => {
+                    const text = await r.text();
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + ': ' + text.substring(0, 300));
+                    }
+                    return text;
                 })
                 .then(text => {
                     const blob = new Blob([text], { type: 'text/plain' });

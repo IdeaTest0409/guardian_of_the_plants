@@ -5,6 +5,48 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Log Download Fix
+
+Fixed the browser log viewer download endpoint.
+
+Symptom on VPS:
+
+```text
+GET /api/logs/download?hours=1&type=all returned HTTP 500.
+The browser showed: Download failed: Download failed
+```
+
+Root cause:
+
+```text
+PostgreSQL rejected timestamp comparison:
+timestamp with time zone >= character varying
+```
+
+The controller generated the `since` value as a formatted `String`, then the
+repository passed it to SQL predicates against `TIMESTAMPTZ` columns:
+
+```sql
+WHERE created_at >= ?
+WHERE received_at >= ?
+```
+
+Fix:
+
+```text
+LogViewerController now creates an OffsetDateTime.
+LogViewerRepository now accepts OffsetDateTime for getChatLogsSince/getAppLogsSince.
+The browser download handler now includes HTTP status and response body preview on failure.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/controller/LogViewerController.java
+server/src/main/java/com/example/guardianplants/LogViewerRepository.java
+server/src/main/resources/static/admin/logs.html
+```
+
 ### Request Flow Tracing
 
 Added request tracing for chat and TTS requests.

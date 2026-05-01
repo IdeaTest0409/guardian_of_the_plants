@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -115,20 +116,19 @@ public class LogViewerController {
             @RequestParam(defaultValue = "1") int hours,
             @RequestParam(defaultValue = "all") String type) {
         int cappedHours = Math.min(Math.max(hours, 1), 24);
-        String sinceTimestamp = Instant.now().minusSeconds(cappedHours * 3600L)
-            .atOffset(ZoneOffset.UTC)
-            .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+        OffsetDateTime since = Instant.now().minusSeconds(cappedHours * 3600L)
+            .atOffset(ZoneOffset.UTC);
 
         StringBuilder sb = new StringBuilder();
         String nowStr = Instant.now().atZone(ZoneOffset.UTC).format(TS_FMT);
         sb.append("=== Guardian Plants Log Export ===\n");
         sb.append("Generated: ").append(nowStr).append(" UTC\n");
-        sb.append("Period: Last ").append(cappedHours).append(" hour(s) (since ").append(sinceTimestamp).append(")\n");
+        sb.append("Period: Last ").append(cappedHours).append(" hour(s) (since ").append(since).append(")\n");
         sb.append("=====================================\n\n");
 
         if ("all".equals(type) || "chat".equals(type)) {
             sb.append("=== CHAT HISTORY ===\n\n");
-            List<Map<String, Object>> chatLogs = logViewerRepository.getChatLogsSince(sinceTimestamp);
+            List<Map<String, Object>> chatLogs = logViewerRepository.getChatLogsSince(since);
             sb.append("Count: ").append(chatLogs.size()).append("\n\n");
             for (Map<String, Object> row : chatLogs) {
                 String ts = formatTs(row.get("created_at"));
@@ -150,7 +150,7 @@ public class LogViewerController {
 
         if ("all".equals(type) || "app".equals(type)) {
             sb.append("=== APP LOGS ===\n\n");
-            List<Map<String, Object>> appLogs = logViewerRepository.getAppLogsSince(sinceTimestamp);
+            List<Map<String, Object>> appLogs = logViewerRepository.getAppLogsSince(since);
             sb.append("Count: ").append(appLogs.size()).append("\n\n");
             for (Map<String, Object> row : appLogs) {
                 String ts = formatTs(row.get("received_at"));

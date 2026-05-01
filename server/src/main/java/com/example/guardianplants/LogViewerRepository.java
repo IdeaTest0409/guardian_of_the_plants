@@ -3,6 +3,7 @@ package com.example.guardianplants;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -43,7 +44,7 @@ public class LogViewerRepository {
         );
     }
 
-    public List<Map<String, Object>> getChatLogsSince(String sinceTimestamp) {
+    public List<Map<String, Object>> getChatLogsSince(OffsetDateTime since) {
         return jdbcTemplate.queryForList(
             """
             SELECT created_at, device_id, conversation_id, role,
@@ -54,11 +55,11 @@ public class LogViewerRepository {
             WHERE created_at >= ?
             ORDER BY created_at ASC
             """,
-            sinceTimestamp
+            since
         );
     }
 
-    public List<Map<String, Object>> getAppLogsSince(String sinceTimestamp) {
+    public List<Map<String, Object>> getAppLogsSince(OffsetDateTime since) {
         return jdbcTemplate.queryForList(
             """
             SELECT received_at, device_id, app_version, severity,
@@ -68,7 +69,7 @@ public class LogViewerRepository {
             WHERE received_at >= ?
             ORDER BY received_at ASC
             """,
-            sinceTimestamp
+            since
         );
     }
 }

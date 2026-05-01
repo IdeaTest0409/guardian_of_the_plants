@@ -44,6 +44,36 @@ curl http://localhost/api/logs/health; echo
 curl http://localhost/api/tts/health; echo
 ```
 
+## Log Download Check
+
+Use this after updating the server or changing log viewer code:
+
+```bash
+curl -i "http://localhost/api/logs/download?hours=1&type=all"
+```
+
+Expected:
+
+```text
+HTTP/1.1 200
+Content-Disposition: attachment; filename="guardian-logs-..."
+```
+
+If it returns 500, check the Spring Boot log:
+
+```bash
+docker logs guardian-server --tail 100
+```
+
+One resolved historical failure was a PostgreSQL type mismatch:
+
+```text
+timestamp with time zone >= character varying
+```
+
+That was fixed by passing `OffsetDateTime` to the repository instead of a
+formatted timestamp string.
+
 ## Logs
 
 ```bash

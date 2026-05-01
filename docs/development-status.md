@@ -77,6 +77,10 @@ GET /api/logs/flow
 GET /api/logs/flow/{traceId}
 ```
 
+`GET /api/logs/download` exports chat history, app logs, and request flows for
+the selected time window. The timestamp filter uses `OffsetDateTime` so
+PostgreSQL `TIMESTAMPTZ` comparisons work correctly.
+
 The page has no authentication yet and must be protected before public use.
 
 ### Milestone 5: Request Flow Tracing
