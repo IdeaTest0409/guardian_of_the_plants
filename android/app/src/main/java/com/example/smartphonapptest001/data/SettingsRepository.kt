@@ -70,6 +70,8 @@ class DataStoreSettingsRepository(
                 cloudBaseUrl = prefs[Keys.cloudBaseUrl] ?: AppSettings.DEFAULT_CLOUD_BASE_URL,
                 cloudModel = prefs[Keys.cloudModel] ?: AppSettings.DEFAULT_CLOUD_MODEL,
                 cloudApiKey = prefs[Keys.cloudApiKey] ?: "",
+                serverManagedPromptMode = prefs[Keys.serverManagedPromptMode]
+                    ?: AppSettings.DEFAULT_SERVER_MANAGED_PROMPT_MODE,
                 streamResponses = prefs[Keys.streamResponses] ?: false,
                 speakAssistantReplies = prefs[Keys.speakAssistantReplies] ?: AppSettings.DEFAULT_SPEAK_ASSISTANT_REPLIES,
                 ttsVoiceProfile = parseTtsVoiceProfile(prefs[Keys.ttsVoiceProfile]),
@@ -111,6 +113,7 @@ class DataStoreSettingsRepository(
             prefs[Keys.cloudBaseUrl] = settings.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL }
             prefs[Keys.cloudModel] = settings.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL }
             prefs[Keys.cloudApiKey] = settings.cloudApiKey
+            prefs[Keys.serverManagedPromptMode] = settings.serverManagedPromptMode
             prefs[Keys.streamResponses] = settings.streamResponses
             prefs[Keys.speakAssistantReplies] = settings.speakAssistantReplies
             prefs[Keys.ttsVoiceProfile] = settings.ttsVoiceProfile.name
@@ -161,6 +164,7 @@ class DataStoreSettingsRepository(
         val cloudBaseUrl = stringPreferencesKey("cloud_base_url")
         val cloudModel = stringPreferencesKey("cloud_model")
         val cloudApiKey = stringPreferencesKey("cloud_api_key")
+        val serverManagedPromptMode = booleanPreferencesKey("server_managed_prompt_mode")
         val streamResponses = booleanPreferencesKey("stream_responses")
         val speakAssistantReplies = booleanPreferencesKey("speak_assistant_replies")
         val ttsVoiceProfile = stringPreferencesKey("tts_voice_profile")

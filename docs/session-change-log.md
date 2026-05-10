@@ -5,6 +5,38 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Server AI Profile Selection And Android Server-Managed Prompt Mode
+
+Added browser-managed AI profile switching for the AP server and a smartphone
+setting for sending only the user text and plant image to the server.
+
+Behavior:
+
+```text
+/admin/ai.html lists configured AI profiles, runs connectivity tests, and switches the active profile.
+GET /api/ai/profiles returns the active profile and configured profiles without exposing API keys.
+POST /api/ai/active stores the selected profile in server_settings.
+POST /api/ai/test calls the profile's /models endpoint for a quick connectivity check.
+ProviderResolver now uses the active profile while preserving the old AI_BASE_URL/AI_MODEL fallback.
+Android Settings now shows "APサーバー制御モード" near the top.
+When enabled in SERVER mode, Android sends only the current user text and plant image instead of local guardian prompts/history.
+The live message endpoint adds a minimal server-side guardian prompt when the client does not send one.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/service/ProviderResolver.java
+server/src/main/java/com/example/guardianplants/ServerSettingsRepository.java
+server/src/main/java/com/example/guardianplants/controller/AiProfileController.java
+server/src/main/java/com/example/guardianplants/controller/LiveController.java
+server/src/main/java/com/example/guardianplants/dto/AiProfile.java
+server/src/main/resources/db/migration/V3__server_settings.sql
+server/src/main/resources/static/admin/ai.html
+android/app/src/main/java/com/example/smartphonapptest001/data/model/AppSettings.kt
+android/app/src/main/java/com/example/smartphonapptest001/viewmodel/ChatViewModel.kt
+```
+
 ### Live Stage Foundation
 
 Added the first server-led AItuber foundation while keeping the existing Android

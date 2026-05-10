@@ -55,6 +55,7 @@ data class SettingsUiState(
     val cloudBaseUrl: String = AppSettings.DEFAULT_CLOUD_BASE_URL,
     val cloudModel: String = AppSettings.DEFAULT_CLOUD_MODEL,
     val cloudApiKey: String = "",
+    val serverManagedPromptMode: Boolean = AppSettings.DEFAULT_SERVER_MANAGED_PROMPT_MODE,
     val streamResponses: Boolean = false,
     val speakAssistantReplies: Boolean = false,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
@@ -99,6 +100,7 @@ class SettingsViewModel(
                         appendLine("cloudBaseUrl=${settings.cloudBaseUrl}")
                         appendLine("cloudModel=${settings.cloudModel}")
                         appendLine("streamResponses=${settings.streamResponses}")
+                        appendLine("serverManagedPromptMode=${settings.serverManagedPromptMode}")
                         appendLine("speakAssistantReplies=${settings.speakAssistantReplies}")
                         appendLine("ttsVoiceProfile=${settings.ttsVoiceProfile.name}")
                         appendLine("ttsSpeechRateMultiplier=${settings.ttsSpeechRateMultiplier}")
@@ -141,6 +143,7 @@ class SettingsViewModel(
                         cloudBaseUrl = settings.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL },
                         cloudModel = settings.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL },
                         cloudApiKey = settings.cloudApiKey,
+                        serverManagedPromptMode = settings.serverManagedPromptMode,
                         streamResponses = settings.streamResponses,
                         speakAssistantReplies = settings.speakAssistantReplies,
                         ttsVoiceProfile = settings.ttsVoiceProfile,
@@ -290,6 +293,10 @@ class SettingsViewModel(
 
     fun onCloudApiKeyChange(value: String) {
         _uiState.update { it.copy(cloudApiKey = value) }
+    }
+
+    fun onServerManagedPromptModeChange(value: Boolean) {
+        _uiState.update { it.copy(serverManagedPromptMode = value) }
     }
 
     fun onStreamResponsesChange(value: Boolean) {
@@ -510,6 +517,7 @@ class SettingsViewModel(
             cloudBaseUrl = state.cloudBaseUrl.ifBlank { AppSettings.DEFAULT_CLOUD_BASE_URL },
             cloudModel = state.cloudModel.ifBlank { AppSettings.DEFAULT_CLOUD_MODEL },
             cloudApiKey = state.cloudApiKey,
+            serverManagedPromptMode = state.serverManagedPromptMode,
             streamResponses = state.streamResponses,
             speakAssistantReplies = state.speakAssistantReplies,
             ttsVoiceProfile = state.ttsVoiceProfile,
@@ -753,6 +761,7 @@ class SettingsViewModel(
                     appendLine("localModel=${next.localModel}")
                     appendLine("cloudBaseUrl=${next.cloudBaseUrl}")
                     appendLine("cloudModel=${next.cloudModel}")
+                    appendLine("serverManagedPromptMode=${next.serverManagedPromptMode}")
                     appendLine("streamResponses=${next.streamResponses}")
                     appendLine("speakAssistantReplies=${next.speakAssistantReplies}")
                     appendLine("ttsVoiceProfile=${next.ttsVoiceProfile.name}")
@@ -846,6 +855,7 @@ private fun AppSettings.toSafeLogString(): String {
         append(", cloudModel=$cloudModel")
         append(", cloudApiKeyPresent=${cloudApiKey.isNotBlank()}")
         append(", cloudApiKeyChars=${cloudApiKey.length}")
+        append(", serverManagedPromptMode=$serverManagedPromptMode")
         append(", streamResponses=$streamResponses")
         append(", speakAssistantReplies=$speakAssistantReplies")
         append(", ttsVoiceProfile=$ttsVoiceProfile")

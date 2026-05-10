@@ -46,6 +46,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://ollama.com/v1}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-gemma4:31b-cloud}
+      AI_ACTIVE_PROFILE: ${AI_ACTIVE_PROFILE:-default}
+      AI_PROFILES_JSON: ${AI_PROFILES_JSON:-}
       VOICEVOX_ENABLED: ${VOICEVOX_ENABLED:-false}
       VOICEVOX_BASE_URL: ${VOICEVOX_BASE_URL:-http://voicevox:50021}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}

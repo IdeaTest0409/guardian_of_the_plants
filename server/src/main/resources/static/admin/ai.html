@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardian Plants - AI Settings</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 20px; background: #f5f5f5; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        h1 { margin: 0 0 16px; font-size: 1.5rem; }
+        .note { color: #666; margin-bottom: 18px; }
+        .current { padding: 12px 14px; border-radius: 8px; background: #e0f2fe; color: #075985; margin-bottom: 16px; font-weight: 700; }
+        .grid { display: grid; gap: 12px; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .card.active { border-color: #16a34a; box-shadow: 0 0 0 2px rgba(22,163,74,.18); }
+        .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .title { font-weight: 700; font-size: 1.05rem; }
+        .meta { margin-top: 8px; color: #555; font-size: .9rem; overflow-wrap: anywhere; }
+        button { border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 700; }
+        button:disabled { background: #aaa; cursor: wait; }
+        .switch { background: #2563eb; color: #fff; }
+        .test { background: #16a34a; color: #fff; }
+        .refresh { background: #4b5563; color: #fff; margin-bottom: 12px; }
+        .result { margin-top: 10px; padding: 10px; border-radius: 6px; background: #f3f4f6; color: #333; white-space: pre-wrap; font-size: .85rem; }
+        .ok { color: #166534; }
+        .bad { color: #991b1b; }
+    </style>
+</head>
+<body>
+    <h1>AI Settings</h1>
+    <div class="note">APサーバー側で使うAIを切り替えます。APIキーは画面に表示しません。</div>
+    <button class="refresh" onclick="loadProfiles()">更新</button>
+    <div id="current" class="current">Loading...</div>
+    <div id="profiles" class="grid"></div>
+
+    <script>
+        let activeProfileId = null;
+
+        function esc(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function loadProfiles() {
+            fetch('/api/ai/profiles', { cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => {
+                    activeProfileId = data.activeProfileId;
+                    document.getElementById('current').textContent = '現在のAI: ' + activeProfileId;
+                    const profiles = data.profiles || [];
+                    document.getElementById('profiles').innerHTML = profiles.map(profile => {
+                        const active = profile.id === activeProfileId;
+                        return '<div class="card ' + (active ? 'active' : '') + '">' +
+                            '<div class="row">' +
+                                '<div class="title">' + esc(profile.label || profile.id) + (active ? ' <span class="ok">使用中</span>' : '') + '</div>' +
+                                '<div>' +
+                                    '<button class="test" onclick="testProfile(\\'' + esc(profile.id) + '\\')">疎通テスト</button> ' +
+                                    '<button class="switch" ' + (active ? 'disabled' : '') + ' onclick="setActive(\\'' + esc(profile.id) + '\\')">切替</button>' +
+                                '</div>' +
+                            '</div>' +
+                            '<div class="meta">id: ' + esc(profile.id) + '</div>' +
+                            '<div class="meta">model: ' + esc(profile.model) + '</div>' +
+                            '<div class="meta">baseUrl: ' + esc(profile.baseUrl) + '</div>' +
+                            '<div id="result-' + esc(profile.id) + '" class="result" style="display:none;"></div>' +
+                            '</div>';
+                    }).join('');
+                })
+                .catch(e => {
+                    document.getElementById('current').innerHTML = '<span class="bad">Load failed: ' + esc(e.message) + '</span>';
+                });
+        }
+
+        function setActive(profileId) {
+            fetch('/api/ai/active', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profileId })
+            })
+                .then(async r => {
+                    const text = await r.text();
+                    if (!r.ok) throw new Error(text);
+                    return JSON.parse(text);
+                })
+                .then(loadProfiles)
+                .catch(e => alert('切替失敗: ' + e.message));
+        }
+
+        function testProfile(profileId) {
+            const box = document.getElementById('result-' + profileId);
+            box.style.display = 'block';
+            box.textContent = 'Testing...';
+            fetch('/api/ai/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profileId })
+            })
+                .then(async r => {
+                    const text = await r.text();
+                    if (!r.ok) throw new Error(text);
+                    return JSON.parse(text);
+                })
+                .then(data => {
+                    box.innerHTML = '<span class="ok">OK</span> durationMs=' + esc(data.durationMs) + '\n' + esc(data.responsePreview || '');
+                })
+                .catch(e => {
+                    box.innerHTML = '<span class="bad">NG</span>\n' + esc(e.message);
+                });
+        }
+
+        loadProfiles();
+    </script>
+</body>
+</html>

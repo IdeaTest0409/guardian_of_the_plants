@@ -86,6 +86,7 @@ class ChatViewModel(
                         appendLine("baseUrl=${settings.activeEndpointConfig.baseUrl}")
                         appendLine("model=${settings.activeEndpointConfig.model}")
                         appendLine("streamResponses=${settings.streamResponses}")
+                        appendLine("serverManagedPromptMode=${settings.serverManagedPromptMode}")
                         appendLine("plant=${activePlantProfile.displayName}")
                         appendLine("companionRole=${settings.companionRole.label}")
                         appendLine("personality=${settings.guardianAngelDisplayName}")
@@ -288,37 +289,54 @@ class ChatViewModel(
 
         sendJob = viewModelScope.launch {
             runCatching {
-                val imageDiagnostic = runPlantImageDiagnostic(userMessage)
-                val knowledgeResult = plantKnowledgeRepository.relevantKnowledge(
-                    query = draft,
-                    plantProfile = activePlantProfile,
-                )
-                logger.log(
-                    AppLogSeverity.DEBUG,
-                    TAG,
-                    "Plant knowledge context prepared",
-                    details = structuredDetails(
-                        "chars" to knowledgeResult.text.length,
-                        "source" to knowledgeResult.source,
-                        "chunkCount" to knowledgeResult.chunkCount,
-                        "empty" to knowledgeResult.isEmpty,
-                    ),
-                )
-                val conversation = buildList {
-                    add(
-                        ChatMessage(
-                            role = ChatRole.SYSTEM,
-                            content = buildPlantGuardianPrompt(
-                                plantProfile = activePlantProfile,
-                                companionRole = activeSettings.companionRole,
-                                personality = activeSettings.guardianAngelPersonality,
-                                thinkingEnabled = activeSettings.thinkingEnabled,
-                                knowledgeContext = knowledgeResult.text,
-                            ),
+                val serverManagedPromptMode = activeSettings.providerType == ProviderType.SERVER &&
+                    activeSettings.serverManagedPromptMode
+                val imageDiagnostic = if (serverManagedPromptMode) null else runPlantImageDiagnostic(userMessage)
+                val conversation = if (serverManagedPromptMode) {
+                    logger.log(
+                        AppLogSeverity.INFO,
+                        TAG,
+                        "Server managed prompt mode active",
+                        details = structuredDetails(
+                            "messageAttachments" to userMessage.attachments.size,
+                            "draftChars" to draft.length,
+                            "historySent" to false,
+                            "androidSystemPromptSent" to false,
                         ),
                     )
-                    addAll(conversationBeforeSend)
-                    add(userMessage)
+                    listOf(userMessage)
+                } else {
+                    val knowledgeResult = plantKnowledgeRepository.relevantKnowledge(
+                        query = draft,
+                        plantProfile = activePlantProfile,
+                    )
+                    logger.log(
+                        AppLogSeverity.DEBUG,
+                        TAG,
+                        "Plant knowledge context prepared",
+                        details = structuredDetails(
+                            "chars" to knowledgeResult.text.length,
+                            "source" to knowledgeResult.source,
+                            "chunkCount" to knowledgeResult.chunkCount,
+                            "empty" to knowledgeResult.isEmpty,
+                        ),
+                    )
+                    buildList {
+                        add(
+                            ChatMessage(
+                                role = ChatRole.SYSTEM,
+                                content = buildPlantGuardianPrompt(
+                                    plantProfile = activePlantProfile,
+                                    companionRole = activeSettings.companionRole,
+                                    personality = activeSettings.guardianAngelPersonality,
+                                    thinkingEnabled = activeSettings.thinkingEnabled,
+                                    knowledgeContext = knowledgeResult.text,
+                                ),
+                            ),
+                        )
+                        addAll(conversationBeforeSend)
+                        add(userMessage)
+                    }
                 }
                 logger.log(
                     AppLogSeverity.DEBUG,
@@ -330,6 +348,7 @@ class ChatViewModel(
                         appendLine("model=${activeSettings.activeEndpointConfig.model}")
                         appendLine("plant=${activePlantProfile.displayName}")
                         appendLine("streamResponses=${activeSettings.streamResponses}")
+                        appendLine("serverManagedPromptMode=$serverManagedPromptMode")
                         appendLine("messageAttachments=${userMessage.attachments.size}")
                         appendLine("plantImagePresent=${plantImage != null}")
                         appendLine("triggeredByAutoSmallTalk=$triggeredByAutoSmallTalk")

@@ -25,6 +25,7 @@ data class AppSettings(
     val cloudBaseUrl: String = DEFAULT_CLOUD_BASE_URL,
     val cloudModel: String = DEFAULT_CLOUD_MODEL,
     val cloudApiKey: String = "",
+    val serverManagedPromptMode: Boolean = DEFAULT_SERVER_MANAGED_PROMPT_MODE,
     val streamResponses: Boolean = false,
     val speakAssistantReplies: Boolean = DEFAULT_SPEAK_ASSISTANT_REPLIES,
     val ttsVoiceProfile: TtsVoiceProfile = TtsVoiceProfile.default(),
@@ -118,6 +119,7 @@ data class AppSettings(
         const val DEFAULT_SPEAK_ASSISTANT_REPLIES = true
         const val DEFAULT_TTS_SPEECH_RATE_MULTIPLIER = 1.2
         const val DEFAULT_VOICEVOX_ENABLED = true
+        const val DEFAULT_SERVER_MANAGED_PROMPT_MODE = false
         const val DEFAULT_AVATAR_EXPRESSION_ENABLED = false
         const val DEFAULT_CHAT_STATUS_BAR_VISIBLE = false
         const val DEFAULT_MR_AVATAR_MOTION_ENABLED = false

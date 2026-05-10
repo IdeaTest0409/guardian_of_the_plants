@@ -20,6 +20,8 @@ ai:
     base-url: ${AI_BASE_URL:https://ollama.com/v1}
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:gemma4:31b-cloud}
+    active-profile: ${AI_ACTIVE_PROFILE:default}
+    profiles-json: ${AI_PROFILES_JSON:}
 
 voicevox:
   enabled: ${VOICEVOX_ENABLED:false}

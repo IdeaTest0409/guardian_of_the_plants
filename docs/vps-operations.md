@@ -114,6 +114,42 @@ realtime images as base64 data URLs. The chat message validation limit is now
 300,000 characters, and validation failures are logged and traced.
 ```
 
+## AI Provider Selection
+
+The server can define multiple AI profiles in `.env` and switch the active
+profile from the browser.
+
+Example `.env`:
+
+```bash
+AI_ACTIVE_PROFILE=cloud-default
+AI_PROFILES_JSON='[{"id":"cloud-default","label":"Cloud default","baseUrl":"https://ollama.com/v1","apiKey":"YOUR_KEY","model":"gemma4:31b-cloud"},{"id":"ollama-gemma4-e2b","label":"AP Ollama gemma4:e2b","baseUrl":"http://host.docker.internal:11434/v1","apiKey":"ollama","model":"gemma4:e2b"}]'
+```
+
+Apply:
+
+```bash
+docker compose up -d --build server
+```
+
+Open:
+
+```text
+http://80.241.214.154/admin/ai.html
+```
+
+API checks:
+
+```bash
+curl -s http://localhost/api/ai/profiles
+curl -s -X POST http://localhost/api/ai/active \
+  -H "Content-Type: application/json" \
+  -d '{"profileId":"ollama-gemma4-e2b"}'
+curl -s -X POST http://localhost/api/ai/test \
+  -H "Content-Type: application/json" \
+  -d '{"profileId":"ollama-gemma4-e2b"}'
+```
+
 ## Smartphone TTS Check
 
 Use this when AI replies are visible on Android but no speech plays.

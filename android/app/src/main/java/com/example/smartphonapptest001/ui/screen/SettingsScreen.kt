@@ -90,6 +90,7 @@ fun SettingsScreen(
     onCloudBaseUrlChange: (String) -> Unit,
     onCloudModelChange: (String) -> Unit,
     onCloudApiKeyChange: (String) -> Unit,
+    onServerManagedPromptModeChange: (Boolean) -> Unit,
     onStreamResponsesChange: (Boolean) -> Unit,
     onSpeakAssistantRepliesChange: (Boolean) -> Unit,
     onTtsVoiceProfileChange: (com.example.smartphonapptest001.data.model.TtsVoiceProfile) -> Unit,
@@ -166,11 +167,33 @@ fun SettingsScreen(
             text = "Plant Guardian Settings",
             style = MaterialTheme.typography.headlineMedium,
         )
-    Text(
-        text = "Choose the plant, the guardian angel personality, and the AI backend you want to use.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+        Text(
+            text = "Choose the plant, the guardian angel personality, and the AI backend you want to use.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "APサーバー制御モード",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = "Server VPS利用時は端末側の守護天使プロンプトや履歴を送らず、本文と植物画像だけ送信します。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = state.serverManagedPromptMode,
+                onCheckedChange = onServerManagedPromptModeChange,
+            )
+        }
 
         Text(
             text = when (state.providerType) {
