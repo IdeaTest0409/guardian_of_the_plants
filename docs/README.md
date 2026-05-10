@@ -16,6 +16,7 @@ db-migration.md           Current manual DB migration notes and future Flyway pl
 mr-3d-safety.md            Android MR/3D crash-avoidance rules.
 tts-job-plan.md            Future async VoiceVOX job design.
 server-rag-plan.md         Future server-side RAG/knowledge migration plan.
+live-aituber-roadmap.md    Current live/AItuber architecture, AP server handoff, and roadmap.
 opencode-handoff.md        Broad project handoff and current status.
 session-change-log.md      Session-level implementation history.
 ```
@@ -31,8 +32,10 @@ Android app
         -> chat_histories
         -> request_traces
       -> VoiceVOX Engine container
-      -> external AI provider
+      -> external AI provider or AP server host Ollama
   -> /admin/logs.html
+  -> /admin/ai.html
+  -> /live/stage.html
 ```
 
 Request flow tracing:
@@ -45,7 +48,8 @@ GET /api/logs/flow/{traceId} detailed steps
 ```
 
 The next major operational tasks are HTTPS/TLS, admin viewer authentication,
-rate limiting, and production-safe secret management.
+live stage prompt-display cleanup, rate limiting, and production-safe secret
+management.
 
 CI:
 

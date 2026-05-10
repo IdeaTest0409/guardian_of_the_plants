@@ -471,3 +471,33 @@ Rate limiting for /api/chat and /api/tts/synthesize
 Proper DB migration workflow for existing volumes
 Production-safe secret handling in VPS .env
 ```
+
+## 2026-05-11
+
+### Live AItuber Strategy and Handoff Docs
+
+Added a handoff memo for the live/AItuber direction:
+
+```text
+docs/live-aituber-roadmap.md
+```
+
+Captured:
+
+```text
+AP server and Gitea server addresses
+Gitea SSH remote and AP server update commands
+current live stage/admin URLs
+AI profile switching model
+AP server host Ollama gemma4:e2b setup
+Android AP server control mode behavior
+known live stage prompt-display issue
+recommended roadmap for OBS stage, audio, guardian visuals, live controls, and admin security
+```
+
+Also refreshed:
+
+```text
+docs/README.md
+docs/development-status.md
+```

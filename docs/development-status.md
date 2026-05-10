@@ -1,6 +1,6 @@
 # Development Status: guardian_of_the_plants
 
-Last updated: 2026-05-01
+Last updated: 2026-05-11
 
 ## Current Summary
 
@@ -12,12 +12,16 @@ Android app (Jetpack Compose)
     -> Spring Boot server container
       -> PostgreSQL container
       -> VoiceVOX Engine container
-      -> external AI provider
+      -> external AI provider or AP server host Ollama
   -> Browser admin viewer at /admin/logs.html
+  -> Browser AI settings at /admin/ai.html
+  -> Browser live stage at /live/stage.html
 ```
 
 Android defaults to the `SERVER` provider. The VPS server owns AI provider
 configuration, so Android does not need an AI API key for server-routed chat.
+When Android AP server control mode is enabled, Android sends only current text
+and selected images while the AP server owns guardian prompts and live behavior.
 
 ## Completed Milestones
 
@@ -127,6 +131,31 @@ VPS helper scripts
 Local secret scan script
 ```
 
+### Milestone 7: Live Stage Foundation and AI Switching
+
+Implemented:
+
+```text
+POST /api/live/message accepts live messages.
+GET /api/live/state exposes latest live state for the browser stage.
+/live/stage.html provides the first OBS/browser-source stage.
+nginx proxies /live/ to the Spring Boot server.
+/admin/ai.html switches the server-side active AI profile.
+GET /api/ai/profiles lists configured profiles with API keys masked.
+POST /api/ai/active changes the active profile.
+POST /api/ai/test verifies provider reachability.
+server_settings stores server-managed settings through Flyway migration V3.
+docker-compose.yml lets the server container reach AP host Ollama through host.docker.internal.
+Android AP server control mode avoids sending local guardian prompts to the AP server.
+```
+
+Current AP server AI options:
+
+```text
+Cloud default:          https://ollama.com/v1, model gemma4:31b-cloud
+AP Ollama gemma4:e2b:  http://host.docker.internal:11434/v1, model gemma4:e2b
+```
+
 ## Current Docker Services
 
 ```text
@@ -145,6 +174,7 @@ still be able to reach the external AI provider over outbound HTTPS.
 app_logs
 chat_histories
 request_traces
+server_settings
 ```
 
 Initial SQL:
@@ -169,6 +199,8 @@ POSTGRES_PASSWORD
 AI_BASE_URL
 AI_API_KEY
 AI_MODEL
+AI_ACTIVE_PROFILE
+AI_PROFILES_JSON
 VOICEVOX_ENABLED
 VOICEVOX_BASE_URL
 RATE_LIMIT_*
@@ -201,13 +233,16 @@ and writes a local warning log.
 | Android Filament native crashes | Known | 3D expression off by default |
 | Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
 | Android `CLOUD` provider | Legacy | Kept for direct LM Studio testing; `SERVER` remains recommended |
+| Live stage can show internal prompt/object text | Open | Separate display text from internal prompts in live state |
+| Admin AI/log pages have no auth | Open | Add Basic Auth or token gate before wider exposure |
 
 ## Next Steps
 
-1. Add HTTPS/TLS to nginx on the VPS.
-2. Add authentication for `/admin/logs.html`.
-3. Verify Flyway startup behavior on the VPS existing database.
-4. Decide whether to keep `CLOUD` provider visible in Android or mark it legacy.
-5. Tune rate limit and retention values after real usage is observed.
-6. Consider async TTS jobs if VoiceVOX latency becomes a problem.
-7. Move RAG/knowledge management server-side.
+1. Fix live stage display text so internal prompts never appear in OBS output.
+2. Add authentication for `/admin/logs.html`, `/admin/ai.html`, and future admin pages.
+3. Improve the 16:9 OBS live stage UI.
+4. Add server-generated TTS/audio playback to the live stage.
+5. Add `/admin/live.html` for live ON/OFF, auto-talk, image preview, and manual speak controls.
+6. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
+7. Add HTTPS/TLS to nginx on the VPS.
+8. Move RAG/knowledge management server-side.
