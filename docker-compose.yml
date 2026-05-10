@@ -30,6 +30,8 @@ services:
         BUILD_TIME: ${BUILD_TIME:-unknown}
         APP_ENV: ${APP_ENV:-local}
     container_name: guardian-server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SERVER_PORT: 8080
       APP_VERSION: ${APP_VERSION:-0.0.1-SNAPSHOT}

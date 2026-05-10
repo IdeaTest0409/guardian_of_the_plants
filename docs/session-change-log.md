@@ -46,6 +46,7 @@ Follow-up:
 
 ```text
 nginx now proxies /live/ to the Spring Boot server so /live/stage.html is served instead of the nginx fallback text.
+docker-compose now maps host.docker.internal to the Docker host gateway so the server container can reach host Ollama.
 ```
 
 ### Browser Log Viewer Delete Action
