@@ -5,13 +5,19 @@ import com.example.guardianplants.dto.ChatRequest;
 import com.example.guardianplants.dto.LiveMessageResponse;
 import com.example.guardianplants.dto.ServerMessage;
 import com.example.guardianplants.service.ChatService;
+import com.example.guardianplants.service.LiveAudioService;
 import com.example.guardianplants.service.LiveStateService;
 import com.example.guardianplants.service.RequestTraceService;
+import com.example.guardianplants.service.TtsService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,11 +34,19 @@ public class LiveController {
     private static final Logger log = LoggerFactory.getLogger(LiveController.class);
 
     private final ChatService chatService;
+    private final TtsService ttsService;
+    private final LiveAudioService liveAudioService;
     private final LiveStateService liveStateService;
     private final RequestTraceService traceService;
 
-    public LiveController(ChatService chatService, LiveStateService liveStateService, RequestTraceService traceService) {
+    public LiveController(ChatService chatService,
+                          TtsService ttsService,
+                          LiveAudioService liveAudioService,
+                          LiveStateService liveStateService,
+                          RequestTraceService traceService) {
         this.chatService = chatService;
+        this.ttsService = ttsService;
+        this.liveAudioService = liveAudioService;
         this.liveStateService = liveStateService;
         this.traceService = traceService;
     }
@@ -56,12 +70,13 @@ public class LiveController {
 
         try {
             String assistantText = chatService.complete(withServerPrompt(request), traceId);
-            Map<String, Object> state = liveStateService.complete(request, assistantText);
+            String audioUrl = synthesizeLiveAudio(assistantText);
+            Map<String, Object> state = liveStateService.complete(request, assistantText, audioUrl);
             return new LiveMessageResponse(
                 UUID.randomUUID().toString(),
                 assistantText,
-                null,
-                null,
+                audioUrl,
+                audioUrl == null ? null : "aac",
                 "complete",
                 state
             );
@@ -77,6 +92,34 @@ public class LiveController {
                 "error",
                 state
             );
+        }
+    }
+
+    @GetMapping("/audio/{id}")
+    public ResponseEntity<?> audio(@PathVariable String id) {
+        var audio = liveAudioService.get(id);
+        if (audio == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "audio not found"));
+        }
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_TYPE, audio.contentType())
+            .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(audio.data().length))
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(audio.data());
+    }
+
+    private String synthesizeLiveAudio(String assistantText) {
+        if (assistantText == null || assistantText.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] wavData = ttsService.synthesize(assistantText, 2);
+            var encoded = ttsService.encodeAac(wavData);
+            String id = liveAudioService.put(encoded.data(), encoded.contentType(), encoded.extension());
+            return "/api/live/audio/" + id;
+        } catch (RuntimeException e) {
+            log.warn("Live audio synthesis skipped", e);
+            return null;
         }
     }
 

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardian Plants - Live Control</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #f4f6f5;
+            color: #242927;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Meiryo", sans-serif;
+        }
+        header {
+            padding: 18px 24px;
+            background: #21342d;
+            color: #fff;
+        }
+        h1 { margin: 0; font-size: 22px; }
+        main {
+            display: grid;
+            grid-template-columns: minmax(320px, 430px) 1fr;
+            gap: 16px;
+            padding: 16px;
+        }
+        section {
+            background: #fff;
+            border: 1px solid #dbe2df;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        h2 {
+            margin: 0 0 12px;
+            font-size: 18px;
+        }
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            font-weight: 700;
+        }
+        textarea, input {
+            width: 100%;
+            border: 1px solid #cbd6d1;
+            border-radius: 6px;
+            padding: 10px;
+            font: inherit;
+        }
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+        button, a.button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            padding: 8px 14px;
+            border: 0;
+            border-radius: 6px;
+            background: #2f7d57;
+            color: #fff;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        button.secondary, a.secondary { background: #48635a; }
+        .row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: #e6f6ee;
+            color: #14633b;
+            font-weight: 700;
+        }
+        .state-grid {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 8px 12px;
+            font-size: 14px;
+        }
+        .state-grid dt { font-weight: 700; color: #51615b; }
+        .state-grid dd { margin: 0; overflow-wrap: anywhere; }
+        .preview {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border: 1px solid #dbe2df;
+            border-radius: 8px;
+            background: #111;
+        }
+        .log {
+            margin-top: 12px;
+            padding: 10px;
+            min-height: 42px;
+            background: #f0f3f2;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-size: 13px;
+        }
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Guardian Plants - Live Control</h1>
+    </header>
+    <main>
+        <section>
+            <h2>Manual Speak</h2>
+            <label for="message">Text</label>
+            <textarea id="message" maxlength="300">今の植物の様子を見て、配信用に自然な一言を話してください。</textarea>
+            <div class="row">
+                <button id="send">Send to Live</button>
+                <button id="refresh" class="secondary">Refresh</button>
+                <a class="button secondary" href="/live/stage.html" target="_blank" rel="noopener">Open Stage</a>
+            </div>
+            <div id="log" class="log"></div>
+        </section>
+        <section>
+            <h2>Current State <span id="status" class="status">loading</span></h2>
+            <iframe class="preview" src="/live/stage.html" title="Live stage preview"></iframe>
+            <dl class="state-grid">
+                <dt>Updated</dt><dd id="updatedAt"></dd>
+                <dt>User</dt><dd id="userText"></dd>
+                <dt>Assistant</dt><dd id="assistantText"></dd>
+                <dt>Audio</dt><dd id="audioUrl"></dd>
+                <dt>Error</dt><dd id="error"></dd>
+            </dl>
+        </section>
+    </main>
+    <script>
+        const log = document.getElementById('log');
+
+        function setLog(text) {
+            log.textContent = text || '';
+        }
+
+        function render(state) {
+            document.getElementById('status').textContent = state.status || 'idle';
+            document.getElementById('updatedAt').textContent = state.updatedAt || '';
+            document.getElementById('userText').textContent = state.userText || '';
+            document.getElementById('assistantText').textContent = state.assistantText || '';
+            document.getElementById('audioUrl').textContent = state.audioUrl || '';
+            document.getElementById('error').textContent = state.error || '';
+        }
+
+        async function refresh() {
+            const res = await fetch('/api/live/state', { cache: 'no-store' });
+            render(await res.json());
+        }
+
+        async function send() {
+            const text = document.getElementById('message').value.trim();
+            if (!text) return;
+            setLog('sending...');
+            const body = {
+                deviceId: 'admin-live',
+                conversationId: 'admin-live',
+                messages: [
+                    { role: 'user', content: text }
+                ],
+                options: { temperature: 0.7, maxTokens: 180 }
+            };
+            const res = await fetch('/api/live/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const payload = await res.json();
+            setLog(JSON.stringify(payload, null, 2));
+            if (payload.state) render(payload.state);
+            await refresh();
+        }
+
+        document.getElementById('send').addEventListener('click', () => send().catch(e => setLog(String(e))));
+        document.getElementById('refresh').addEventListener('click', () => refresh().catch(e => setLog(String(e))));
+        refresh().catch(e => setLog(String(e)));
+        setInterval(() => refresh().catch(() => {}), 5000);
+    </script>
+</body>
+</html>

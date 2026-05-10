@@ -501,6 +501,34 @@ server/src/main/java/com/example/guardianplants/controller/LiveController.java
 server/src/main/resources/static/live/stage.html
 ```
 
+### Live Stage Audio, Temporary 3D Guardian, and Live Control Page
+
+Added the next live-stage iteration.
+
+Behavior:
+
+```text
+/live/stage.html uses smaller three-line caption text.
+/live/stage.html renders a temporary Three.js guardian with status-based motion.
+/live/stage.html has an Enable Audio button and plays new live audio URLs.
+POST /api/live/message now attempts server-side VoiceVOX synthesis for the
+assistant reply, encodes AAC/M4A, stores recent audio in memory, and exposes
+audioUrl in live state.
+GET /api/live/audio/{id} returns recent live audio.
+/admin/live.html can send manual live messages, refresh live state, and preview
+the stage.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/controller/LiveController.java
+server/src/main/java/com/example/guardianplants/service/LiveAudioService.java
+server/src/main/java/com/example/guardianplants/service/LiveStateService.java
+server/src/main/resources/static/live/stage.html
+server/src/main/resources/static/admin/live.html
+```
+
 ### Live AItuber Strategy and Handoff Docs
 
 Added a handoff memo for the live/AItuber direction:

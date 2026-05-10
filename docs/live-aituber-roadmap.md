@@ -51,6 +51,7 @@ Main public pages on the AP server:
 ```text
 http://80.241.214.154/admin/logs.html
 http://80.241.214.154/admin/ai.html
+http://80.241.214.154/admin/live.html
 http://80.241.214.154/live/stage.html
 ```
 
@@ -64,6 +65,7 @@ POST /api/ai/test
 POST /api/chat
 POST /api/live/message
 GET  /api/live/state
+GET  /api/live/audio/{id}
 POST /api/tts/synthesize
 GET  /api/logs/flow
 DELETE /api/logs
@@ -79,6 +81,9 @@ The server keeps latest live state in memory.
 /live/stage.html polls /api/live/state and displays plant image, guardian area,
 current text, status, and audio URL when present.
 nginx proxies /live/ to the Spring Boot server.
+/live/stage.html includes a temporary Three.js guardian and an Enable Audio
+button for browser autoplay restrictions.
+/admin/live.html can send manual live messages and preview the stage.
 ```
 
 The live stage is intended for OBS browser-source capture. It is not yet the
@@ -190,15 +195,15 @@ AP-server-managed guardian prompt.
 
 Recommended priority order:
 
-1. Add server-generated audio to the stage.
+1. Improve live control operations.
 
-   Server should create VoiceVOX/AAC audio and expose `audioUrl` in live state.
-   The browser stage needs an audio enable button because browser autoplay can
-   block sound until user interaction.
+   Add live ON/OFF, auto-talk interval, TTS speaker selection, image preview,
+   and reset controls to `/admin/live.html`.
 
-2. Add guardian visuals in stages.
+2. Replace guardian visuals with a real asset.
 
-   Start with 2D expressions before full 3D. Suggested states:
+   The current stage has a temporary Three.js guardian. Replace it with a
+   project-owned 2D/3D character asset. Suggested states:
 
    ```text
    idle
@@ -211,28 +216,7 @@ Recommended priority order:
 
    Full 3D or VRM can be added later after the live flow is stable.
 
-3. Add a live control page.
-
-   Candidate URL:
-
-   ```text
-   /admin/live.html
-   ```
-
-   Useful controls:
-
-   ```text
-   live ON/OFF
-   auto-talk ON/OFF
-   auto-talk interval
-   current image preview
-   manual speak textbox
-   active AI profile selector
-   TTS speaker selector
-   stage reset button
-   ```
-
-4. Split AI roles by purpose.
+3. Split AI roles by purpose.
 
    The current active AI is global. For production live use, separate profiles
    may be better:
@@ -248,7 +232,7 @@ Recommended priority order:
    Note: local `gemma4:e2b` is useful for low-cost text, but image diagnosis
    may need a vision-capable model.
 
-5. Add admin security.
+4. Add admin security.
 
    The admin pages are currently convenient but should be protected before
    wider use:

@@ -15,31 +15,20 @@
             color: #f7fbf8;
             font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
         }
-        body {
-            display: grid;
-            place-items: center;
-        }
+        body { display: grid; place-items: center; }
         .frame {
             position: relative;
             width: 100vw;
             height: 100vh;
             aspect-ratio: 16 / 9;
             overflow: hidden;
-            background:
-                linear-gradient(90deg, rgba(8, 13, 12, 0.18), rgba(8, 13, 12, 0.76)),
-                #101815;
+            background: linear-gradient(135deg, #14201c 0%, #0b1110 100%);
         }
         @media (min-aspect-ratio: 16/9) {
-            .frame {
-                width: calc(100vh * 16 / 9);
-                height: 100vh;
-            }
+            .frame { width: calc(100vh * 16 / 9); height: 100vh; }
         }
         @media (max-aspect-ratio: 16/9) {
-            .frame {
-                width: 100vw;
-                height: calc(100vw * 9 / 16);
-            }
+            .frame { width: 100vw; height: calc(100vw * 9 / 16); }
         }
         .plant-layer {
             position: absolute;
@@ -60,63 +49,46 @@
             color: #a8bdb2;
             font-size: clamp(26px, 3vw, 52px);
             font-weight: 700;
-            letter-spacing: 0;
         }
         .shade {
             position: absolute;
             inset: 0;
             background:
                 linear-gradient(180deg, rgba(4, 8, 7, 0.52), transparent 18%, transparent 58%, rgba(4, 8, 7, 0.72)),
-                linear-gradient(90deg, transparent 0%, transparent 52%, rgba(5, 9, 8, 0.72) 100%);
+                linear-gradient(90deg, transparent 0%, transparent 52%, rgba(5, 9, 8, 0.74) 100%);
             pointer-events: none;
         }
         .guardian-area {
             position: absolute;
             right: 4.4%;
-            top: 13%;
+            top: 10%;
             width: 25%;
-            height: 48%;
+            height: 56%;
             display: grid;
             grid-template-rows: 1fr auto auto;
             justify-items: center;
             align-items: end;
         }
-        .halo {
-            position: absolute;
-            top: 1%;
-            width: 58%;
-            aspect-ratio: 1;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255, 225, 133, 0.86), rgba(255, 247, 201, 0.22) 48%, transparent 72%);
-            filter: blur(1px);
+        #guardian-canvas {
+            width: min(100%, 340px);
+            height: min(100%, 430px);
+            min-height: 320px;
+            display: block;
         }
-        .guardian {
-            position: relative;
+        .guardian-fallback {
+            display: none;
             width: min(100%, 320px);
             aspect-ratio: 0.82;
             border-radius: 8px;
-            background:
-                linear-gradient(150deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02)),
-                linear-gradient(180deg, #f0d489, #c99636);
-            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.46);
-            display: grid;
+            background: linear-gradient(180deg, #f0d489, #c99636);
             place-items: center;
             color: #3d2a10;
             font-size: clamp(52px, 6vw, 110px);
             font-weight: 800;
-        }
-        .guardian::before {
-            content: "";
-            position: absolute;
-            top: 12%;
-            width: 48%;
-            height: 8%;
-            border: 5px solid rgba(255, 251, 220, 0.96);
-            border-radius: 50%;
-            transform: translateY(-165%);
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.46);
         }
         .guardian-name {
-            margin-top: 18px;
+            margin-top: 10px;
             font-size: clamp(22px, 2.2vw, 38px);
             font-weight: 800;
             text-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
@@ -129,8 +101,24 @@
             color: #9ee7d0;
             font-size: clamp(13px, 1vw, 18px);
             font-weight: 700;
-            letter-spacing: 0;
             text-transform: uppercase;
+        }
+        .audio-button {
+            position: absolute;
+            right: 4.5%;
+            top: 4.2%;
+            padding: 10px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            border-radius: 8px;
+            background: rgba(9, 16, 14, 0.72);
+            color: #f7fbf8;
+            font-size: clamp(13px, 1vw, 18px);
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .audio-button.enabled {
+            color: #112018;
+            background: #9ee7d0;
         }
         .user-text {
             position: absolute;
@@ -153,9 +141,9 @@
             position: absolute;
             left: 4.5%;
             right: 4.5%;
-            bottom: 5.6%;
-            min-height: 17%;
-            padding: 24px 32px;
+            bottom: 5.2%;
+            height: 24%;
+            padding: 22px 30px;
             border-radius: 8px;
             background: rgba(5, 9, 8, 0.86);
             border: 1px solid rgba(181, 231, 207, 0.32);
@@ -163,15 +151,13 @@
             display: flex;
             align-items: center;
             color: #fbfff9;
-            font-size: clamp(34px, 3.3vw, 62px);
+            font-size: clamp(28px, 2.35vw, 46px);
             font-weight: 800;
-            line-height: 1.35;
-            letter-spacing: 0;
+            line-height: 1.32;
+            overflow: hidden;
             text-shadow: 0 3px 12px rgba(0, 0, 0, 0.62);
         }
-        .error {
-            color: #ffb5b5;
-        }
+        .error { color: #ffb5b5; }
     </style>
 </head>
 <body>
@@ -181,25 +167,47 @@
             <div id="plant-placeholder" class="plant-placeholder">植物画像を待っています</div>
         </section>
         <div class="shade"></div>
+        <button id="audio-toggle" class="audio-button" type="button">Enable Audio</button>
         <aside class="guardian-area">
-            <div class="halo"></div>
-            <div class="guardian">天</div>
+            <canvas id="guardian-canvas"></canvas>
+            <div id="guardian-fallback" class="guardian-fallback">天</div>
             <div class="guardian-name">守護天使</div>
             <div id="status" class="status">idle</div>
         </aside>
         <div id="user-text" class="user-text">スマホからのメッセージ待ち</div>
         <div id="caption" class="caption">スマホから話しかけると、ここに守護天使の返答が表示されます。</div>
+        <audio id="live-audio" preload="auto"></audio>
     </main>
-    <script>
+    <script type="module">
         let lastUpdatedAt = null;
+        let lastAudioUrl = null;
+        let audioEnabled = false;
+        let currentStatus = 'idle';
+
+        const audio = document.getElementById('live-audio');
+        const audioToggle = document.getElementById('audio-toggle');
+        audioToggle.addEventListener('click', () => {
+            audioEnabled = true;
+            audioToggle.classList.add('enabled');
+            audioToggle.textContent = 'Audio Enabled';
+            audio.play().catch(() => {});
+        });
 
         function textOrFallback(value, fallback) {
             return value && String(value).trim() ? String(value) : fallback;
         }
 
+        function playAudio(url) {
+            if (!audioEnabled || !url || url === lastAudioUrl) return;
+            lastAudioUrl = url;
+            audio.src = url + '?t=' + Date.now();
+            audio.play().catch(() => {});
+        }
+
         function render(state) {
             if (!state || state.updatedAt === lastUpdatedAt) return;
             lastUpdatedAt = state.updatedAt;
+            currentStatus = textOrFallback(state.status, 'idle');
 
             const image = document.getElementById('plant-image');
             const placeholder = document.getElementById('plant-placeholder');
@@ -213,7 +221,7 @@
                 placeholder.style.display = 'block';
             }
 
-            document.getElementById('status').textContent = textOrFallback(state.status, 'idle');
+            document.getElementById('status').textContent = currentStatus;
             document.getElementById('user-text').textContent = textOrFallback(state.userText, 'スマホからのメッセージ待ち');
 
             const caption = document.getElementById('caption');
@@ -224,9 +232,10 @@
                 caption.classList.remove('error');
                 caption.textContent = textOrFallback(
                     state.assistantText,
-                    state.status === 'thinking' ? '守護天使が考えています。' : 'スマホから話しかけると、ここに守護天使の返答が表示されます。'
+                    currentStatus === 'thinking' ? '守護天使が考えています。' : 'スマホから話しかけると、ここに守護天使の返答が表示されます。'
                 );
             }
+            playAudio(state.audioUrl);
         }
 
         function loadState() {
@@ -234,10 +243,90 @@
                 .then(r => r.json())
                 .then(render)
                 .catch(() => {
+                    currentStatus = 'offline';
                     document.getElementById('status').textContent = 'offline';
                 });
         }
 
+        async function startGuardian3d() {
+            try {
+                const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js');
+                const canvas = document.getElementById('guardian-canvas');
+                const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+                camera.position.set(0, 0.35, 5.6);
+
+                const light = new THREE.DirectionalLight(0xfff1ba, 2.2);
+                light.position.set(2, 3, 4);
+                scene.add(light);
+                scene.add(new THREE.AmbientLight(0x9ee7d0, 1.6));
+
+                const group = new THREE.Group();
+                scene.add(group);
+
+                const robe = new THREE.Mesh(
+                    new THREE.CapsuleGeometry(0.9, 1.35, 12, 28),
+                    new THREE.MeshStandardMaterial({ color: 0xd8a941, roughness: 0.52, metalness: 0.08 })
+                );
+                robe.position.y = -0.45;
+                group.add(robe);
+
+                const head = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.58, 32, 24),
+                    new THREE.MeshStandardMaterial({ color: 0xf2d184, roughness: 0.48 })
+                );
+                head.position.y = 0.92;
+                group.add(head);
+
+                const halo = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.72, 0.035, 12, 64),
+                    new THREE.MeshStandardMaterial({ color: 0xfff6c8, emissive: 0xffdf7b, emissiveIntensity: 0.8 })
+                );
+                halo.position.y = 1.65;
+                halo.rotation.x = Math.PI / 2;
+                group.add(halo);
+
+                const wingMat = new THREE.MeshStandardMaterial({ color: 0xf8fbef, roughness: 0.6 });
+                const leftWing = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 16), wingMat);
+                leftWing.scale.set(0.46, 1.08, 0.12);
+                leftWing.position.set(-0.78, 0.28, -0.08);
+                leftWing.rotation.z = 0.45;
+                group.add(leftWing);
+                const rightWing = leftWing.clone();
+                rightWing.position.x = 0.78;
+                rightWing.rotation.z = -0.45;
+                group.add(rightWing);
+
+                function resize() {
+                    const rect = canvas.getBoundingClientRect();
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    renderer.setSize(rect.width, rect.height, false);
+                    camera.aspect = rect.width / rect.height;
+                    camera.updateProjectionMatrix();
+                }
+                window.addEventListener('resize', resize);
+                resize();
+
+                function animate(time) {
+                    const t = time * 0.001;
+                    const thinking = currentStatus === 'thinking';
+                    const error = currentStatus === 'error' || currentStatus === 'offline';
+                    group.rotation.y = Math.sin(t * 0.65) * 0.16;
+                    group.position.y = Math.sin(t * (thinking ? 2.2 : 1.1)) * 0.08;
+                    halo.rotation.z = t * 0.8;
+                    robe.material.color.set(error ? 0xb85a4f : thinking ? 0xe4c65f : 0xd8a941);
+                    renderer.render(scene, camera);
+                    requestAnimationFrame(animate);
+                }
+                requestAnimationFrame(animate);
+            } catch (e) {
+                document.getElementById('guardian-canvas').style.display = 'none';
+                document.getElementById('guardian-fallback').style.display = 'grid';
+            }
+        }
+
+        startGuardian3d();
         loadState();
         setInterval(loadState, 1000);
     </script>

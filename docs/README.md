@@ -35,6 +35,7 @@ Android app
       -> external AI provider or AP server host Ollama
   -> /admin/logs.html
   -> /admin/ai.html
+  -> /admin/live.html
   -> /live/stage.html
 ```
 

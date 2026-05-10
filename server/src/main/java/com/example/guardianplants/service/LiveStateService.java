@@ -51,6 +51,10 @@ public class LiveStateService {
     }
 
     public Map<String, Object> complete(ChatRequest request, String assistantText) {
+        return complete(request, assistantText, null);
+    }
+
+    public Map<String, Object> complete(ChatRequest request, String assistantText, String audioUrl) {
         LiveState previous = state.get();
         LiveState next = new LiveState(
             previous.sessionId(),
@@ -58,7 +62,7 @@ public class LiveStateService {
             latestDisplayUserText(request),
             sanitizeDisplayText(assistantText, MAX_ASSISTANT_DISPLAY_CHARS),
             latestImageDataUrl(request, previous.plantImageDataUrl()),
-            null,
+            audioUrl,
             null,
             OffsetDateTime.now(ZoneOffset.UTC).toString()
         );

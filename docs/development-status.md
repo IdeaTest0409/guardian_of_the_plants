@@ -15,6 +15,7 @@ Android app (Jetpack Compose)
       -> external AI provider or AP server host Ollama
   -> Browser admin viewer at /admin/logs.html
   -> Browser AI settings at /admin/ai.html
+  -> Browser live controls at /admin/live.html
   -> Browser live stage at /live/stage.html
 ```
 
@@ -139,6 +140,7 @@ Implemented:
 POST /api/live/message accepts live messages.
 GET /api/live/state exposes latest live state for the browser stage.
 /live/stage.html provides the first OBS/browser-source stage.
+/admin/live.html provides manual live message controls and stage preview.
 nginx proxies /live/ to the Spring Boot server.
 /admin/ai.html switches the server-side active AI profile.
 GET /api/ai/profiles lists configured profiles with API keys masked.
@@ -238,9 +240,9 @@ and writes a local warning log.
 
 ## Next Steps
 
-1. Add server-generated TTS/audio playback to the live stage.
-2. Add `/admin/live.html` for live ON/OFF, auto-talk, image preview, and manual speak controls.
-3. Add authentication for `/admin/logs.html`, `/admin/ai.html`, and future admin pages.
+1. Add authentication for `/admin/logs.html`, `/admin/ai.html`, `/admin/live.html`, and future admin pages.
+2. Add live ON/OFF and auto-talk interval controls to `/admin/live.html`.
+3. Replace the temporary Three.js guardian with a proper 2D/3D character asset.
 4. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
 5. Add HTTPS/TLS to nginx on the VPS.
 6. Move RAG/knowledge management server-side.
