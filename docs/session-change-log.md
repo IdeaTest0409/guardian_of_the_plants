@@ -42,6 +42,12 @@ android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerCha
 android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatRequest.kt
 ```
 
+Follow-up:
+
+```text
+nginx now proxies /live/ to the Spring Boot server so /live/stage.html is served instead of the nginx fallback text.
+```
+
 ### Browser Log Viewer Delete Action
 
 Added a server-side delete action for the browser log viewer.
