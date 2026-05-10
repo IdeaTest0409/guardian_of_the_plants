@@ -529,6 +529,30 @@ server/src/main/resources/static/live/stage.html
 server/src/main/resources/static/admin/live.html
 ```
 
+### Live Stage Android GLB and PC Voice Input
+
+Changed the live stage character from the temporary Three.js primitive guardian
+to the Android angel model.
+
+Behavior:
+
+```text
+angel_egna.glb is copied into server static assets at /live/assets/models/angel_egna.glb.
+/live/stage.html loads angel_egna.glb with Three.js GLTFLoader.
+The stage keeps the existing Enable Audio flow and attempts simple mouth morph
+movement while audio is playing if matching morph targets are present.
+/admin/live.html supports PC text chat, Web Speech API voice input, and quick
+choice buttons for common plant questions.
+```
+
+Changed:
+
+```text
+server/src/main/resources/static/live/assets/models/angel_egna.glb
+server/src/main/resources/static/live/stage.html
+server/src/main/resources/static/admin/live.html
+```
+
 ### Live AItuber Strategy and Handoff Docs
 
 Added a handoff memo for the live/AItuber direction:

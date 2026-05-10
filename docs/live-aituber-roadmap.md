@@ -84,6 +84,10 @@ nginx proxies /live/ to the Spring Boot server.
 /live/stage.html includes a temporary Three.js guardian and an Enable Audio
 button for browser autoplay restrictions.
 /admin/live.html can send manual live messages and preview the stage.
+/live/stage.html now loads the Android angel model `angel_egna.glb` through
+Three.js GLTFLoader from `/live/assets/models/angel_egna.glb`.
+/admin/live.html supports PC text chat, Web Speech API voice input, and quick
+choice buttons similar to the smartphone shortcuts.
 ```
 
 The live stage is intended for OBS browser-source capture. It is not yet the
@@ -200,10 +204,11 @@ Recommended priority order:
    Add live ON/OFF, auto-talk interval, TTS speaker selection, image preview,
    and reset controls to `/admin/live.html`.
 
-2. Replace guardian visuals with a real asset.
+2. Tune the guardian model for OBS.
 
-   The current stage has a temporary Three.js guardian. Replace it with a
-   project-owned 2D/3D character asset. Suggested states:
+   The stage now uses `angel_egna.glb`, but camera, scale, lighting, animation,
+   and mouth/face morph handling should be tuned through real OBS testing.
+   Suggested states:
 
    ```text
    idle

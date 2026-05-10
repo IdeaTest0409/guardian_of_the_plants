@@ -242,7 +242,7 @@ and writes a local warning log.
 
 1. Add authentication for `/admin/logs.html`, `/admin/ai.html`, `/admin/live.html`, and future admin pages.
 2. Add live ON/OFF and auto-talk interval controls to `/admin/live.html`.
-3. Replace the temporary Three.js guardian with a proper 2D/3D character asset.
+3. Tune the `angel_egna.glb` live-stage camera, lighting, animation, and morph handling.
 4. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
 5. Add HTTPS/TLS to nginx on the VPS.
 6. Move RAG/knowledge management server-side.
