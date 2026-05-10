@@ -45,16 +45,19 @@
                 .then(r => r.json())
                 .then(data => {
                     activeProfileId = data.activeProfileId;
-                    document.getElementById('current').textContent = '現在のAI: ' + activeProfileId;
                     const profiles = data.profiles || [];
+                    const activeProfile = profiles.find(profile => profile.id === activeProfileId);
+                    document.getElementById('current').textContent = activeProfile
+                        ? '現在のAI: ' + (activeProfile.label || activeProfile.id) + ' / model: ' + activeProfile.model
+                        : '現在のAI: ' + activeProfileId;
                     document.getElementById('profiles').innerHTML = profiles.map(profile => {
                         const active = profile.id === activeProfileId;
                         return '<div class="card ' + (active ? 'active' : '') + '">' +
                             '<div class="row">' +
                                 '<div class="title">' + esc(profile.label || profile.id) + (active ? ' <span class="ok">使用中</span>' : '') + '</div>' +
                                 '<div>' +
-                                    '<button class="test" onclick="testProfile(\\'' + esc(profile.id) + '\\')">疎通テスト</button> ' +
-                                    '<button class="switch" ' + (active ? 'disabled' : '') + ' onclick="setActive(\\'' + esc(profile.id) + '\\')">切替</button>' +
+                                    '<button class="test" data-action="test" data-profile-id="' + esc(profile.id) + '">疎通テスト</button> ' +
+                                    '<button class="switch" data-action="switch" data-profile-id="' + esc(profile.id) + '" ' + (active ? 'disabled' : '') + '>切替</button>' +
                                 '</div>' +
                             '</div>' +
                             '<div class="meta">id: ' + esc(profile.id) + '</div>' +
@@ -63,6 +66,12 @@
                             '<div id="result-' + esc(profile.id) + '" class="result" style="display:none;"></div>' +
                             '</div>';
                     }).join('');
+                    document.querySelectorAll('[data-action="test"]').forEach(button => {
+                        button.addEventListener('click', () => testProfile(button.dataset.profileId));
+                    });
+                    document.querySelectorAll('[data-action="switch"]').forEach(button => {
+                        button.addEventListener('click', () => setActive(button.dataset.profileId));
+                    });
                 })
                 .catch(e => {
                     document.getElementById('current').innerHTML = '<span class="bad">Load failed: ' + esc(e.message) + '</span>';
