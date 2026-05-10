@@ -161,57 +161,42 @@ should be centralized on the AP server.
 
 ## Current Known Issue
 
-The live stage can currently show an internal object-like string at the top
+The live stage previously could show an internal object-like string at the top
 left, for example:
 
 ```text
 {type=text, text=自動雑談です。ユーザーにはこの指示文を見せず...
 ```
 
-Likely cause:
+Cause:
 
 ```text
-LiveStateService currently derives latestUserText from ServerMessage content
-using contentAsString(), which can stringify structured content arrays/objects.
-Some auto-talk/internal prompt text is also being treated as display text.
+LiveStateService derived latestUserText from ServerMessage content using
+contentAsString(), which can stringify structured content arrays/objects.
+Some auto-talk/internal prompt text was also being treated as display text.
 ```
 
-Recommended fix:
+Current mitigation:
 
 ```text
-Separate internal prompt text from user-visible display text.
-Extract only plain user text for the stage.
-Hide auto-talk/system instructions from /api/live/state.
-Consider fields such as userText, displayUserText, assistantText, internalPrompt.
+LiveStateService extracts only plain text parts for display.
+Internal auto-talk instructions are replaced with "自動トーク" in live state.
+LiveController ignores client system prompts for live messages and injects the
+AP-server-managed guardian prompt.
+/live/stage.html has been rebuilt as a 16:9 OBS-friendly display.
 ```
 
 ## Next Implementation Strategy
 
 Recommended priority order:
 
-1. Fix live state display text.
-
-   Make the stage safe for public display before adding more effects. Internal
-   prompts must never appear in OBS/browser output.
-
-2. Finish AP server managed prompt control.
-
-   Android should remain a capture/input client in server mode. The AP server
-   should own guardian personality, auto-talk rules, history summary, image
-   diagnostic decisions, and safety text.
-
-3. Improve the OBS stage UI.
-
-   Target 16:9 browser source first. Add stable safe areas, captions, plant
-   image framing, guardian status, and a layout that works at 1920x1080.
-
-4. Add server-generated audio to the stage.
+1. Add server-generated audio to the stage.
 
    Server should create VoiceVOX/AAC audio and expose `audioUrl` in live state.
    The browser stage needs an audio enable button because browser autoplay can
    block sound until user interaction.
 
-5. Add guardian visuals in stages.
+2. Add guardian visuals in stages.
 
    Start with 2D expressions before full 3D. Suggested states:
 
@@ -226,7 +211,7 @@ Recommended priority order:
 
    Full 3D or VRM can be added later after the live flow is stable.
 
-6. Add a live control page.
+3. Add a live control page.
 
    Candidate URL:
 
@@ -247,7 +232,7 @@ Recommended priority order:
    stage reset button
    ```
 
-7. Split AI roles by purpose.
+4. Split AI roles by purpose.
 
    The current active AI is global. For production live use, separate profiles
    may be better:
@@ -263,7 +248,7 @@ Recommended priority order:
    Note: local `gemma4:e2b` is useful for low-cost text, but image diagnosis
    may need a vision-capable model.
 
-8. Add admin security.
+5. Add admin security.
 
    The admin pages are currently convenient but should be protected before
    wider use:

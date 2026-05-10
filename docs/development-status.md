@@ -233,16 +233,14 @@ and writes a local warning log.
 | Android Filament native crashes | Known | 3D expression off by default |
 | Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
 | Android `CLOUD` provider | Legacy | Kept for direct LM Studio testing; `SERVER` remains recommended |
-| Live stage can show internal prompt/object text | Open | Separate display text from internal prompts in live state |
+| Live stage can show internal prompt/object text | Mitigated | Live state now extracts display text only and replaces internal auto-talk prompts |
 | Admin AI/log pages have no auth | Open | Add Basic Auth or token gate before wider exposure |
 
 ## Next Steps
 
-1. Fix live stage display text so internal prompts never appear in OBS output.
-2. Add authentication for `/admin/logs.html`, `/admin/ai.html`, and future admin pages.
-3. Improve the 16:9 OBS live stage UI.
-4. Add server-generated TTS/audio playback to the live stage.
-5. Add `/admin/live.html` for live ON/OFF, auto-talk, image preview, and manual speak controls.
-6. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
-7. Add HTTPS/TLS to nginx on the VPS.
-8. Move RAG/knowledge management server-side.
+1. Add server-generated TTS/audio playback to the live stage.
+2. Add `/admin/live.html` for live ON/OFF, auto-talk, image preview, and manual speak controls.
+3. Add authentication for `/admin/logs.html`, `/admin/ai.html`, and future admin pages.
+4. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
+5. Add HTTPS/TLS to nginx on the VPS.
+6. Move RAG/knowledge management server-side.

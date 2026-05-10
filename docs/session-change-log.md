@@ -474,6 +474,33 @@ Production-safe secret handling in VPS .env
 
 ## 2026-05-11
 
+### Live Stage Display Safety and OBS Layout
+
+Updated the first live stage implementation to make it safer for OBS/browser
+output.
+
+Changed behavior:
+
+```text
+LiveStateService extracts display text from structured message content instead
+of using contentAsString().
+Internal auto-talk/system instruction text is not exposed as stage user text.
+LiveController ignores client-provided system prompts for live messages and
+injects the AP-server-managed guardian prompt.
+LiveController preserves image_url parts while replacing internal user text
+with a short live-talk request.
+/live/stage.html was rebuilt as a 16:9 OBS-friendly layout with Japanese
+placeholders, safe caption areas, plant image framing, and guardian status.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/service/LiveStateService.java
+server/src/main/java/com/example/guardianplants/controller/LiveController.java
+server/src/main/resources/static/live/stage.html
+```
+
 ### Live AItuber Strategy and Handoff Docs
 
 Added a handoff memo for the live/AItuber direction:

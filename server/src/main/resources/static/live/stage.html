@@ -6,159 +6,185 @@
     <title>Plant Guardian Live Stage</title>
     <style>
         * { box-sizing: border-box; }
-        body {
+        html, body {
             margin: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            background: #101614;
+            background: #0b1110;
             color: #f7fbf8;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: "Noto Sans JP", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
         }
-        .stage {
+        body {
+            display: grid;
+            place-items: center;
+        }
+        .frame {
             position: relative;
             width: 100vw;
             height: 100vh;
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) 34vw;
-            gap: 0;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
             background:
-                linear-gradient(90deg, rgba(16, 22, 20, 0.18), rgba(16, 22, 20, 0.72)),
-                #101614;
+                linear-gradient(90deg, rgba(8, 13, 12, 0.18), rgba(8, 13, 12, 0.76)),
+                #101815;
         }
-        .plant-panel {
-            position: relative;
-            min-width: 0;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #17211d;
+        @media (min-aspect-ratio: 16/9) {
+            .frame {
+                width: calc(100vh * 16 / 9);
+                height: 100vh;
+            }
+        }
+        @media (max-aspect-ratio: 16/9) {
+            .frame {
+                width: 100vw;
+                height: calc(100vw * 9 / 16);
+            }
+        }
+        .plant-layer {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            background:
+                radial-gradient(circle at 22% 24%, rgba(98, 148, 119, 0.22), transparent 34%),
+                linear-gradient(135deg, #14201c 0%, #0b1110 100%);
         }
         .plant-image {
             width: 100%;
             height: 100%;
             object-fit: contain;
+            filter: saturate(1.05) contrast(1.02);
         }
         .plant-placeholder {
-            color: #9fb3a9;
-            font-size: clamp(22px, 3vw, 42px);
+            color: #a8bdb2;
+            font-size: clamp(26px, 3vw, 52px);
+            font-weight: 700;
             letter-spacing: 0;
         }
-        .guardian-panel {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 4vh 3vw 20vh;
-            background: linear-gradient(180deg, rgba(31, 43, 38, 0.9), rgba(11, 15, 14, 0.96));
+        .shade {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(180deg, rgba(4, 8, 7, 0.52), transparent 18%, transparent 58%, rgba(4, 8, 7, 0.72)),
+                linear-gradient(90deg, transparent 0%, transparent 52%, rgba(5, 9, 8, 0.72) 100%);
+            pointer-events: none;
+        }
+        .guardian-area {
+            position: absolute;
+            right: 4.4%;
+            top: 13%;
+            width: 25%;
+            height: 48%;
+            display: grid;
+            grid-template-rows: 1fr auto auto;
+            justify-items: center;
+            align-items: end;
         }
         .halo {
-            width: min(22vw, 280px);
-            height: min(22vw, 280px);
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(248, 224, 137, 0.9), rgba(250, 244, 210, 0.16) 48%, rgba(250, 244, 210, 0) 70%);
-            filter: blur(2px);
             position: absolute;
-            top: 14vh;
+            top: 1%;
+            width: 58%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 225, 133, 0.86), rgba(255, 247, 201, 0.22) 48%, transparent 72%);
+            filter: blur(1px);
         }
         .guardian {
             position: relative;
-            width: min(24vw, 320px);
-            aspect-ratio: 1;
-            border-radius: 28px;
+            width: min(100%, 320px);
+            aspect-ratio: 0.82;
+            border-radius: 8px;
             background:
-                linear-gradient(150deg, rgba(255,255,255,0.22), rgba(255,255,255,0.04)),
-                linear-gradient(180deg, #f4d990, #c99b3c);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #3c2c10;
-            font-size: clamp(40px, 6vw, 84px);
-            font-weight: 700;
+                linear-gradient(150deg, rgba(255,255,255,0.22), rgba(255,255,255,0.02)),
+                linear-gradient(180deg, #f0d489, #c99636);
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.46);
+            display: grid;
+            place-items: center;
+            color: #3d2a10;
+            font-size: clamp(52px, 6vw, 110px);
+            font-weight: 800;
         }
         .guardian::before {
             content: "";
             position: absolute;
-            top: 14%;
-            width: 46%;
-            height: 9%;
-            border: 5px solid rgba(255, 251, 220, 0.94);
+            top: 12%;
+            width: 48%;
+            height: 8%;
+            border: 5px solid rgba(255, 251, 220, 0.96);
             border-radius: 50%;
-            transform: translateY(-155%);
+            transform: translateY(-165%);
         }
-        .name {
+        .guardian-name {
             margin-top: 18px;
-            font-size: clamp(22px, 2.8vw, 38px);
-            font-weight: 700;
+            font-size: clamp(22px, 2.2vw, 38px);
+            font-weight: 800;
+            text-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
         }
         .status {
-            margin-top: 8px;
+            margin-top: 7px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(16, 28, 24, 0.74);
             color: #9ee7d0;
-            font-size: clamp(13px, 1.3vw, 18px);
-            text-transform: uppercase;
-        }
-        .caption {
-            position: absolute;
-            left: 4vw;
-            right: 4vw;
-            bottom: 5vh;
-            min-height: 120px;
-            padding: 24px 30px;
-            border-radius: 18px;
-            background: rgba(8, 13, 11, 0.82);
-            border: 1px solid rgba(173, 231, 204, 0.28);
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
-            font-size: clamp(26px, 3.2vw, 52px);
+            font-size: clamp(13px, 1vw, 18px);
             font-weight: 700;
-            line-height: 1.45;
-            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.48);
+            letter-spacing: 0;
+            text-transform: uppercase;
         }
         .user-text {
             position: absolute;
-            left: 4vw;
-            top: 4vh;
-            max-width: 58vw;
-            padding: 10px 14px;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #d7e8df;
-            font-size: clamp(14px, 1.4vw, 20px);
+            left: 4.5%;
+            top: 5.2%;
+            max-width: 48%;
+            padding: 12px 18px;
+            border-radius: 8px;
+            background: rgba(7, 13, 11, 0.66);
+            border: 1px solid rgba(178, 225, 202, 0.22);
+            color: #dceee5;
+            font-size: clamp(18px, 1.45vw, 28px);
+            font-weight: 700;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
         }
-        @media (max-width: 800px) {
-            .stage { grid-template-columns: 1fr; }
-            .guardian-panel {
-                position: absolute;
-                right: 3vw;
-                bottom: 20vh;
-                width: 28vw;
-                min-width: 132px;
-                height: auto;
-                padding: 0;
-                background: transparent;
-            }
-            .halo { display: none; }
-            .guardian { width: 100%; border-radius: 18px; }
-            .name, .status { display: none; }
-            .caption { min-height: 92px; font-size: clamp(22px, 5vw, 36px); }
+        .caption {
+            position: absolute;
+            left: 4.5%;
+            right: 4.5%;
+            bottom: 5.6%;
+            min-height: 17%;
+            padding: 24px 32px;
+            border-radius: 8px;
+            background: rgba(5, 9, 8, 0.86);
+            border: 1px solid rgba(181, 231, 207, 0.32);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+            display: flex;
+            align-items: center;
+            color: #fbfff9;
+            font-size: clamp(34px, 3.3vw, 62px);
+            font-weight: 800;
+            line-height: 1.35;
+            letter-spacing: 0;
+            text-shadow: 0 3px 12px rgba(0, 0, 0, 0.62);
+        }
+        .error {
+            color: #ffb5b5;
         }
     </style>
 </head>
 <body>
-    <main class="stage">
-        <section class="plant-panel">
-            <img id="plant-image" class="plant-image" alt="最新の植物画像" style="display:none;">
+    <main class="frame">
+        <section class="plant-layer">
+            <img id="plant-image" class="plant-image" alt="植物画像" style="display:none;">
             <div id="plant-placeholder" class="plant-placeholder">植物画像を待っています</div>
         </section>
-        <aside class="guardian-panel">
+        <div class="shade"></div>
+        <aside class="guardian-area">
             <div class="halo"></div>
             <div class="guardian">天</div>
-            <div class="name">守護天使</div>
+            <div class="guardian-name">守護天使</div>
             <div id="status" class="status">idle</div>
         </aside>
         <div id="user-text" class="user-text">スマホからのメッセージ待ち</div>
@@ -189,9 +215,18 @@
 
             document.getElementById('status').textContent = textOrFallback(state.status, 'idle');
             document.getElementById('user-text').textContent = textOrFallback(state.userText, 'スマホからのメッセージ待ち');
-            document.getElementById('caption').textContent = state.error
-                ? 'エラー: ' + state.error
-                : textOrFallback(state.assistantText, 'スマホから話しかけると、ここに守護天使の返答が表示されます。');
+
+            const caption = document.getElementById('caption');
+            if (state.error) {
+                caption.classList.add('error');
+                caption.textContent = 'エラー: ' + state.error;
+            } else {
+                caption.classList.remove('error');
+                caption.textContent = textOrFallback(
+                    state.assistantText,
+                    state.status === 'thinking' ? '守護天使が考えています。' : 'スマホから話しかけると、ここに守護天使の返答が表示されます。'
+                );
+            }
         }
 
         function loadState() {
