@@ -61,4 +61,26 @@ class AppStartControllerTest {
             .andExpect(jsonPath("$.status", is("stored")))
             .andExpect(jsonPath("$.id", is(123)));
     }
+
+    @Test
+    void appLogStoresClientLog() throws Exception {
+        when(jdbcTemplate.queryForObject(any(String.class), eq(Long.class), any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(456L);
+
+        mockMvc.perform(post("/api/logs")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "deviceId": "browser-live-stage",
+                      "appVersion": "web",
+                      "severity": "ERROR",
+                      "category": "LiveStage3D",
+                      "message": "3D init failed",
+                      "details": {"error": "import failed"}
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status", is("stored")))
+            .andExpect(jsonPath("$.id", is(456)));
+    }
 }

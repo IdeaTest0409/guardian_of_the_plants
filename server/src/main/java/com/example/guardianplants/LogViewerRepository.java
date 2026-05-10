@@ -54,7 +54,8 @@ public class LogViewerRepository {
         return jdbcTemplate.queryForList(
             """
             SELECT id, received_at, device_id, app_version, severity,
-                   category, left(message, 200) as message_preview
+                   category, left(message, 200) as message_preview,
+                   left(coalesce(details::text, ''), 500) as details_preview
             FROM app_logs
             ORDER BY received_at DESC
             LIMIT ?
@@ -67,7 +68,8 @@ public class LogViewerRepository {
         return jdbcTemplate.queryForList(
             """
             SELECT id, received_at, device_id, app_version, severity,
-                   category, left(message, 200) as message_preview
+                   category, left(message, 200) as message_preview,
+                   left(coalesce(details::text, ''), 500) as details_preview
             FROM app_logs
             WHERE received_at >= ?
             ORDER BY received_at DESC

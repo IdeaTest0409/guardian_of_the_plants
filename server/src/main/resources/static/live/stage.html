@@ -259,10 +259,36 @@
         });
     }
 
+    function errorDetails(error, extra = {}) {
+      return {
+        errorName: error?.name || '',
+        errorMessage: error?.message || String(error || ''),
+        errorStack: error?.stack ? String(error.stack).slice(0, 1200) : '',
+        userAgent: navigator.userAgent,
+        url: location.href,
+        ...extra
+      };
+    }
+
+    function logClientError(message, error, extra = {}) {
+      fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: 'browser-live-stage',
+          appVersion: 'web',
+          severity: 'ERROR',
+          category: 'LiveStage3D',
+          message,
+          details: errorDetails(error, extra)
+        })
+      }).catch(() => {});
+    }
+
     async function startGuardian3d() {
       try {
-        const THREE = await import('https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js');
-        const { GLTFLoader } = await import('https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/loaders/GLTFLoader.js');
+        const THREE = await import('https://esm.sh/three@0.164.1');
+        const { GLTFLoader } = await import('https://esm.sh/three@0.164.1/examples/jsm/loaders/GLTFLoader.js');
         const canvas = document.getElementById('guardian-canvas');
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
         const scene = new THREE.Scene();
@@ -314,8 +340,12 @@
             document.getElementById('model-loading').style.display = 'none';
           },
           undefined,
-          () => {
-            document.getElementById('model-loading').textContent = '3Dモデルを読み込めませんでした';
+          (error) => {
+            console.error('angel_egna.glb load failed', error);
+            logClientError('angel_egna.glb load failed', error, {
+              modelUrl: '/live/assets/models/angel_egna.glb'
+            });
+            document.getElementById('model-loading').textContent = '3Dモデルを読み込めませんでした: ' + (error?.message || 'load failed');
             document.getElementById('guardian-canvas').style.display = 'none';
             document.getElementById('guardian-fallback').style.display = 'grid';
           }
@@ -340,9 +370,14 @@
         }
         requestAnimationFrame(animate);
       } catch (e) {
+        console.error('3D init failed', e);
+        logClientError('3D init failed', e, {
+          threeProvider: 'esm.sh',
+          modelUrl: '/live/assets/models/angel_egna.glb'
+        });
         document.getElementById('guardian-canvas').style.display = 'none';
         document.getElementById('guardian-fallback').style.display = 'grid';
-        document.getElementById('model-loading').textContent = '3D表示を初期化できませんでした';
+        document.getElementById('model-loading').textContent = '3D表示を初期化できませんでした: ' + (e?.message || 'init failed');
       }
     }
 

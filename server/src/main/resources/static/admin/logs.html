@@ -123,6 +123,7 @@
                         <th class="hide-mobile">会話ID</th>
                         <th>ロール</th>
                         <th>メッセージ</th>
+                        <th class="hide-mobile">Details</th>
                         <th class="hide-mobile">ステータス</th>
                     </tr>
                 </thead>
@@ -159,7 +160,7 @@
                     </tr>
                 </thead>
                 <tbody id="app-tbody">
-                    <tr><td colspan="5" class="empty-msg">Loading...</td></tr>
+                    <tr><td colspan="6" class="empty-msg">Loading...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -387,7 +388,7 @@
                     document.getElementById('app-count').textContent = '(' + data.length + '件)';
                     const tbody = document.getElementById('app-tbody');
                     if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">No data</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">No data</td></tr>';
                         return;
                     }
                     tbody.innerHTML = data.map(row => {
@@ -399,11 +400,12 @@
                             '<td class="hide-mobile">' + esc(row.app_version) + '</td>' +
                             '<td>' + esc(row.category) + '</td>' +
                             '<td><span class="' + sevClass + '">' + esc(row.message_preview) + '</span></td>' +
+                            '<td class="hide-mobile">' + esc(row.details_preview || '') + '</td>' +
                             '</tr>';
                     }).join('');
                 })
                 .catch(e => {
-                    document.getElementById('app-tbody').innerHTML = '<tr><td colspan="5" class="empty-msg">Error: ' + esc(e.message) + '</td></tr>';
+                    document.getElementById('app-tbody').innerHTML = '<tr><td colspan="6" class="empty-msg">Error: ' + esc(e.message) + '</td></tr>';
                 })
                 .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; } });
         }
