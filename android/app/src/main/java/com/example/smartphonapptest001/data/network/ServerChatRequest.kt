@@ -18,6 +18,20 @@ data class ServerChatRequest(
 )
 
 @Serializable
+data class LiveMessageResponse(
+    @SerialName("messageId")
+    val messageId: String? = null,
+    @SerialName("assistantText")
+    val assistantText: String = "",
+    @SerialName("audioUrl")
+    val audioUrl: String? = null,
+    @SerialName("audioFormat")
+    val audioFormat: String? = null,
+    @SerialName("status")
+    val status: String = "",
+)
+
+@Serializable
 data class ServerMessage(
     @SerialName("role")
     val role: String,

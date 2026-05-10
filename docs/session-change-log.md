@@ -5,6 +5,43 @@ current state and next steps, prefer `development-status.md`.
 
 ## 2026-05-01
 
+### Live Stage Foundation
+
+Added the first server-led AItuber foundation while keeping the existing Android
+chat path compatible.
+
+Behavior:
+
+```text
+Android non-streaming server chat tries POST /api/live/message first.
+If /api/live/message is unavailable, Android falls back to the existing /api/chat stream path.
+POST /api/live/message generates the guardian reply on the server and updates Live State.
+GET /api/live/state exposes the latest user text, assistant text, image data URL, status, and future audio URL.
+/live/stage.html polls Live State and renders an OBS-friendly browser stage.
+The initial live response is text-first; audioUrl/audioFormat fields are reserved for the next phase.
+```
+
+Gitea:
+
+```text
+Added local git remote named gitea.
+Configured URL: http://158.220.99.197:3000/tomoki/guardian_of_the_plants.git
+No push was performed.
+git ls-remote currently returns Not found, so the Gitea repository path still needs confirmation.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/service/ChatService.java
+server/src/main/java/com/example/guardianplants/service/LiveStateService.java
+server/src/main/java/com/example/guardianplants/controller/LiveController.java
+server/src/main/java/com/example/guardianplants/dto/LiveMessageResponse.java
+server/src/main/resources/static/live/stage.html
+android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatApi.kt
+android/app/src/main/java/com/example/smartphonapptest001/data/network/ServerChatRequest.kt
+```
+
 ### Browser Log Viewer Delete Action
 
 Added a server-side delete action for the browser log viewer.

@@ -7,9 +7,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -101,12 +103,78 @@ class ServerChatApi(
         conversationId: String,
         options: Map<String, Any>? = null,
     ): String {
+        completeLiveMessage(messages, deviceId, conversationId, options)?.let { return it }
         var accumulated = ""
         stream(messages, deviceId, conversationId, options).collect { token ->
             accumulated = token.text
             if (token.finished) return@collect
         }
         return accumulated
+    }
+
+    private suspend fun completeLiveMessage(
+        messages: List<ServerMessage>,
+        deviceId: String,
+        conversationId: String,
+        options: Map<String, Any>? = null,
+    ): String? {
+        val normalizedUrl = baseUrl.trim().trimEnd('/')
+        if (normalizedUrl.isBlank()) {
+            error("Server chat API base URL is not configured")
+        }
+
+        val request = ServerChatRequest(
+            deviceId = deviceId,
+            conversationId = conversationId,
+            messages = messages,
+            options = options?.mapValues { (_, v) -> toJsonElement(v) },
+        )
+
+        return runCatching {
+            val response = client.post("$normalizedUrl/live/message") {
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+                setBody(request)
+            }
+            val body = response.bodyAsText()
+            if (!response.status.isSuccess()) {
+                logger.log(
+                    AppLogSeverity.WARN,
+                    TAG,
+                    "Live message API returned non-success status",
+                    details = "status=${response.status.value}\nbody=${body.take(500)}",
+                )
+                return null
+            }
+            val parsed = json.decodeFromString(LiveMessageResponse.serializer(), body)
+            if (parsed.status == "error") {
+                logger.log(
+                    AppLogSeverity.WARN,
+                    TAG,
+                    "Live message API returned error status",
+                    details = "messageId=${parsed.messageId.orEmpty()}",
+                )
+                return null
+            }
+            logger.log(
+                AppLogSeverity.INFO,
+                TAG,
+                "Live message completed",
+                details = listOf(
+                    "messageId=${parsed.messageId.orEmpty()}",
+                    "replyChars=${parsed.assistantText.length}",
+                    "audioUrl=${parsed.audioUrl.orEmpty()}",
+                ).joinToString(separator = "\n"),
+            )
+            parsed.assistantText
+        }.onFailure { error ->
+            logger.log(
+                AppLogSeverity.WARN,
+                TAG,
+                "Live message API failed; falling back to chat stream",
+                details = "type=${error::class.java.simpleName}\nmessage=${error.message.orEmpty()}",
+            )
+        }.getOrNull()
     }
 
     companion object {

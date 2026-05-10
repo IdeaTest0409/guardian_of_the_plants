@@ -14,6 +14,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -183,6 +184,56 @@ public class ChatService {
         return emitter;
     }
 
+    public String complete(ChatRequest request, String traceId) {
+        String deviceId = request.deviceId() != null ? request.deviceId() : "unknown";
+        String conversationId = request.conversationId() != null ? request.conversationId() : UUID.randomUUID().toString();
+        String model = providerResolver.getModel();
+
+        if (request.messages() != null && !request.messages().isEmpty()) {
+            var lastUser = request.messages().get(request.messages().size() - 1);
+            if ("user".equalsIgnoreCase(lastUser.role())) {
+                String metadata = chatHistoryRepository.buildMetadata("server-live", model, "ok");
+                chatHistoryRepository.insert(deviceId, conversationId, "user", lastUser.contentAsString(), metadata);
+                traceService.recordDbSaved(traceId, "user");
+            }
+        }
+
+        Map<String, Object> upstreamBody = buildUpstreamRequest(request, model);
+        upstreamBody.put("stream", false);
+
+        String apiKey = providerResolver.getApiKey();
+        if (apiKey == null || apiKey.isBlank()) {
+            traceService.recordError(traceId, "live", "ai_call", "API key not configured");
+            throw new IllegalStateException("AI API key is not configured");
+        }
+
+        traceService.recordAiCall(traceId, model);
+        long aiCallStart = System.currentTimeMillis();
+        String body = webClientBuilder.build()
+            .post()
+            .uri(providerResolver.getBaseUrl() + "/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + apiKey)
+            .bodyValue(upstreamBody)
+            .retrieve()
+            .onStatus(
+                status -> status.isError(),
+                response -> response.bodyToMono(String.class)
+                    .map(errorBody -> new RuntimeException("Upstream API error: " + response.statusCode() + " - " + errorBody))
+            )
+            .bodyToMono(String.class)
+            .block();
+
+        String reply = extractAssistantText(body);
+        long aiDuration = System.currentTimeMillis() - aiCallStart;
+        traceService.recordAiResponse(traceId, reply.length(), aiDuration);
+        String metadata = chatHistoryRepository.buildMetadata("server-live", model, "completed");
+        chatHistoryRepository.insert(deviceId, conversationId, "assistant", reply, metadata);
+        traceService.recordDbSaved(traceId, "assistant");
+        traceService.recordComplete(traceId, "live");
+        return reply;
+    }
+
     private Map<String, Object> buildUpstreamRequest(ChatRequest request, String model) {
         Map<String, Object> body = new java.util.LinkedHashMap<>();
         body.put("model", model);
@@ -235,5 +286,28 @@ public class ChatService {
             }
         }
         return content;
+    }
+
+    private String extractAssistantText(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode choices = root.get("choices");
+            if (choices != null && choices.isArray() && choices.size() > 0) {
+                JsonNode message = choices.get(0).get("message");
+                if (message != null && message.has("content")) {
+                    return message.get("content").asText("");
+                }
+                JsonNode text = choices.get(0).get("text");
+                if (text != null) {
+                    return text.asText("");
+                }
+            }
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to parse non-stream AI response", e);
+        }
+        return "";
     }
 }
