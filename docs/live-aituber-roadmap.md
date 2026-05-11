@@ -88,6 +88,9 @@ button for browser autoplay restrictions.
 Three.js GLTFLoader from `/live/assets/models/angel_egna.glb`.
 /admin/live.html supports PC text chat, Web Speech API voice input, and quick
 choice buttons similar to the smartphone shortcuts.
+/admin/live.html can attach a local plant image file to the next PC chat
+message. The browser converts it to a data URL and sends it through the same
+image part format used by the smartphone flow.
 /admin/live.html also has an Auto topic toggle. While the admin page is open,
 it can periodically send a short prompt so the guardian starts a topic by
 itself.
@@ -101,6 +104,8 @@ browser error messages, user agent, and model URL.
 /live/stage.html normalizes the GLB to the ground, plays an idle animation if
 the GLB has one, lowers arm bones as a fallback, and drives mouth morphs from
 the actual audio waveform instead of a fixed timer.
+For non-raw pose presets, the stage disables GLB animation mixer playback and
+applies stronger arm-bone rotations so pose changes are visibly testable.
 ```
 
 The live stage is intended for OBS browser-source capture. It is not yet the

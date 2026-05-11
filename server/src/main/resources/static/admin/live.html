@@ -51,6 +51,16 @@
       min-height: 116px;
       resize: vertical;
     }
+    .image-preview {
+      display: none;
+      width: 100%;
+      max-height: 180px;
+      object-fit: contain;
+      margin-top: 8px;
+      border: 1px solid #dbe2df;
+      border-radius: 8px;
+      background: #eef3f0;
+    }
     button, a.button {
       display: inline-flex;
       align-items: center;
@@ -166,6 +176,10 @@
       <label for="message">Message</label>
       <textarea id="message" maxlength="300" placeholder="PCから守護天使に話しかける"></textarea>
 
+      <label for="plant-image-file">Plant image</label>
+      <input id="plant-image-file" type="file" accept="image/*">
+      <img id="plant-image-preview" class="image-preview" alt="Plant image preview">
+
       <label>Quick Choices</label>
       <div id="quick-grid" class="quick-grid"></div>
 
@@ -199,6 +213,7 @@
         <button id="send">Send</button>
         <button id="voice" class="secondary">Voice Input</button>
         <button id="clear" class="warn">Clear</button>
+        <button id="clear-image" class="secondary">Clear Image</button>
       </div>
       <div class="hint">
         音声入力はChrome/Edge系ブラウザで動作します。HTTP環境ではブラウザ設定によりマイク許可が制限される場合があります。
@@ -242,11 +257,14 @@
     const autoTopic = document.getElementById('auto-topic');
     const autoTopicMinutes = document.getElementById('auto-topic-minutes');
     const posePreset = document.getElementById('pose-preset');
+    const plantImageFile = document.getElementById('plant-image-file');
+    const plantImagePreview = document.getElementById('plant-image-preview');
     let recognition = null;
     let listening = false;
     let latestState = null;
     let lastAutoTopicAt = 0;
     let autoTopicSending = false;
+    let selectedPlantImageDataUrl = null;
 
     function setLog(text) {
       log.textContent = text || '';
@@ -307,11 +325,15 @@
 
     async function sendText(text, conversationId) {
       setLog('sending...');
+      const content = selectedPlantImageDataUrl ? [
+        { type: 'text', text },
+        { type: 'image_url', image_url: { url: selectedPlantImageDataUrl } }
+      ] : text;
       const body = {
         deviceId: 'admin-live',
         conversationId,
         messages: [
-          { role: 'user', content: text }
+          { role: 'user', content }
         ],
         options: { temperature: 0.7, maxTokens: 180 }
       };
@@ -324,6 +346,46 @@
       setLog(JSON.stringify(payload, null, 2));
       if (payload.state) render(payload.state);
       await refresh();
+    }
+
+    function setPlantImageDataUrl(dataUrl) {
+      selectedPlantImageDataUrl = dataUrl;
+      if (dataUrl) {
+        plantImagePreview.src = dataUrl;
+        plantImagePreview.style.display = 'block';
+      } else {
+        plantImagePreview.removeAttribute('src');
+        plantImagePreview.style.display = 'none';
+      }
+    }
+
+    function readSelectedImage(file) {
+      if (!file) {
+        setPlantImageDataUrl(null);
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        setLog('image error: please choose an image file');
+        plantImageFile.value = '';
+        setPlantImageDataUrl(null);
+        return;
+      }
+      if (file.size > 4 * 1024 * 1024) {
+        setLog('image error: file is larger than 4MB');
+        plantImageFile.value = '';
+        setPlantImageDataUrl(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPlantImageDataUrl(String(reader.result || ''));
+        setLog('image selected: ' + file.name);
+      };
+      reader.onerror = () => {
+        setLog('image error: failed to read file');
+        setPlantImageDataUrl(null);
+      };
+      reader.readAsDataURL(file);
     }
 
     async function maybeSendAutoTopic() {
@@ -415,6 +477,12 @@
       message.value = '';
       message.focus();
     });
+    document.getElementById('clear-image').addEventListener('click', () => {
+      plantImageFile.value = '';
+      setPlantImageDataUrl(null);
+      setLog('image cleared');
+    });
+    plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
 
     setupQuickChoices();

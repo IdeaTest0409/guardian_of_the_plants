@@ -543,10 +543,16 @@ The stage keeps the existing Enable Audio flow and attempts simple mouth morph
 movement while audio is playing if matching morph targets are present.
 /admin/live.html supports PC text chat, Web Speech API voice input, and quick
 choice buttons for common plant questions.
+/admin/live.html can attach a local plant image file to the next chat message;
+the file is converted to a data URL in the browser and sent as an image part.
 /admin/live.html has an Auto topic toggle. While the page is open, it can send
 a periodic guardian-initiated prompt.
 /admin/live.html has a 3D Pose selector. The selected preset is stored through
 GET/POST /api/live/settings and applied by /live/stage.html.
+The first pass did not visibly change the model posture because GLB animation
+or bone-axis assumptions could override the rest pose. The stage now disables
+the mixer for non-raw presets, applies stronger arm-bone rotations, and logs
+`poseBoneCount` when a preset is applied.
 Browser-side 3D initialization and GLB load failures are posted to
 POST /api/logs and show up in /admin/logs.html as category LiveStage3D.
 The App Logs table now includes a short details preview for client-side error
