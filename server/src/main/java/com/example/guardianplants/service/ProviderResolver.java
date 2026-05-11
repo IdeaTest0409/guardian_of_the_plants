@@ -1,5 +1,6 @@
 package com.example.guardianplants.service;
 
+import com.example.guardianplants.AiProfileRepository;
 import com.example.guardianplants.ServerSettingsRepository;
 import com.example.guardianplants.dto.AiProfile;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -7,10 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.LinkedHashMap;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class ProviderResolver {
@@ -18,7 +17,8 @@ public class ProviderResolver {
     public static final String ACTIVE_AI_PROFILE_KEY = "active_ai_profile_id";
 
     private final ServerSettingsRepository settingsRepository;
-    private final List<AiProfile> profiles;
+    private final AiProfileRepository profileRepository;
+    private final List<AiProfile> envProfiles;
     private final String defaultProfileId;
 
     public ProviderResolver(
@@ -28,11 +28,14 @@ public class ProviderResolver {
             @Value("${ai.provider.active-profile:default}") String activeProfile,
             @Value("${ai.provider.profiles-json:}") String profilesJson,
             ServerSettingsRepository settingsRepository,
+            AiProfileRepository profileRepository,
             ObjectMapper objectMapper) {
         this.settingsRepository = settingsRepository;
-        this.profiles = loadProfiles(baseUrl, apiKey, model, profilesJson, objectMapper);
+        this.profileRepository = profileRepository;
+        this.envProfiles = loadProfiles(baseUrl, apiKey, model, profilesJson, objectMapper);
+        seedProfilesIfEmpty();
         this.defaultProfileId = activeProfile == null || activeProfile.isBlank()
-            ? this.profiles.get(0).id()
+            ? getProfiles().get(0).id()
             : activeProfile;
     }
 
@@ -50,6 +53,7 @@ public class ProviderResolver {
 
     public AiProfile getActiveProfile() {
         String activeId = settingsRepository.get(ACTIVE_AI_PROFILE_KEY).orElse(defaultProfileId);
+        List<AiProfile> profiles = getProfiles();
         return profiles.stream()
             .filter(profile -> profile.id().equals(activeId))
             .findFirst()
@@ -61,15 +65,66 @@ public class ProviderResolver {
     }
 
     public List<AiProfile> getProfiles() {
-        return profiles;
+        List<AiProfile> dbProfiles = profileRepository.findEnabled();
+        return dbProfiles.isEmpty() ? envProfiles : dbProfiles;
     }
 
     public void setActiveProfile(String profileId) {
-        boolean exists = profiles.stream().anyMatch(profile -> profile.id().equals(profileId));
+        boolean exists = getProfiles().stream().anyMatch(profile -> profile.id().equals(profileId));
         if (!exists) {
             throw new IllegalArgumentException("Unknown AI profile: " + profileId);
         }
         settingsRepository.set(ACTIVE_AI_PROFILE_KEY, profileId);
+    }
+
+    public AiProfile getProfile(String profileId) {
+        return getProfiles().stream()
+            .filter(profile -> profile.id().equals(profileId))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown AI profile: " + profileId));
+    }
+
+    public void saveProfile(AiProfile profile) {
+        validateProfile(profile);
+        if (profileRepository.exists(profile.id())) {
+            AiProfile current = profileRepository.findById(profile.id()).orElseThrow();
+            String apiKey = profile.apiKey();
+            profileRepository.update(new AiProfile(
+                profile.id(),
+                profile.label(),
+                profile.baseUrl(),
+                apiKey == null || apiKey.isBlank() ? current.apiKey() : apiKey,
+                profile.model()
+            ));
+        } else {
+            profileRepository.upsert(profile);
+        }
+    }
+
+    public void deleteProfile(String profileId) {
+        if (getActiveProfileId().equals(profileId)) {
+            throw new IllegalArgumentException("Active AI profile cannot be deleted");
+        }
+        profileRepository.disable(profileId);
+    }
+
+    private void seedProfilesIfEmpty() {
+        if (!profileRepository.findEnabled().isEmpty()) return;
+        envProfiles.forEach(profileRepository::upsert);
+    }
+
+    private void validateProfile(AiProfile profile) {
+        if (profile == null) throw new IllegalArgumentException("AI profile is required");
+        if (isBlank(profile.id()) || !profile.id().matches("[A-Za-z0-9][A-Za-z0-9_.:-]{1,119}")) {
+            throw new IllegalArgumentException("Profile id must be 2-120 chars: letters, numbers, _, ., :, -");
+        }
+        if (isBlank(profile.label())) throw new IllegalArgumentException("Profile label is required");
+        if (isBlank(profile.baseUrl())) throw new IllegalArgumentException("Profile baseUrl is required");
+        if (isBlank(profile.model())) throw new IllegalArgumentException("Profile model is required");
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private List<AiProfile> loadProfiles(

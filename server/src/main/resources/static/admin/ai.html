@@ -8,114 +8,254 @@
         * { box-sizing: border-box; }
         body { margin: 0; padding: 20px; background: #f5f5f5; color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
         h1 { margin: 0 0 16px; font-size: 1.5rem; }
-        .note { color: #666; margin-bottom: 18px; }
+        h2 { margin: 0 0 12px; font-size: 1.05rem; }
+        label { display: block; margin: 10px 0 4px; font-weight: 700; }
+        input { width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+        .note { color: #555; margin-bottom: 18px; line-height: 1.5; }
         .current { padding: 12px 14px; border-radius: 8px; background: #e0f2fe; color: #075985; margin-bottom: 16px; font-weight: 700; }
+        .layout { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 14px; align-items: start; }
         .grid { display: grid; gap: 12px; }
-        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .card, .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .card.active { border-color: #16a34a; box-shadow: 0 0 0 2px rgba(22,163,74,.18); }
         .row { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
         .title { font-weight: 700; font-size: 1.05rem; }
         .meta { margin-top: 8px; color: #555; font-size: .9rem; overflow-wrap: anywhere; }
+        .hint { color: #666; font-size: .85rem; margin-top: 6px; }
         button { border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 700; }
         button:disabled { background: #aaa; cursor: wait; }
         .switch { background: #2563eb; color: #fff; }
         .test { background: #16a34a; color: #fff; }
+        .edit { background: #4b5563; color: #fff; }
+        .delete { background: #dc2626; color: #fff; }
+        .save { background: #0f766e; color: #fff; }
+        .secondary { background: #e5e7eb; color: #111827; }
         .refresh { background: #4b5563; color: #fff; margin-bottom: 12px; }
         .result { margin-top: 10px; padding: 10px; border-radius: 6px; background: #f3f4f6; color: #333; white-space: pre-wrap; font-size: .85rem; }
         .ok { color: #166534; }
         .bad { color: #991b1b; }
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
     <h1>AI Settings</h1>
-    <div class="note">APサーバー側で使うAIを切り替えます。APIキーは画面に表示しません。</div>
-    <button class="refresh" onclick="loadProfiles()">更新</button>
+    <div class="note">
+        APサーバー側で使うAIモデルを管理します。APIキーは保存できますが、画面には再表示しません。
+        APIキー欄を空のまま保存した場合、既存のキーを維持します。
+    </div>
+    <button class="refresh" id="refresh">更新</button>
     <div id="current" class="current">Loading...</div>
-    <div id="profiles" class="grid"></div>
+
+    <div class="layout">
+        <section class="panel">
+            <h2 id="form-title">AI Profile</h2>
+            <label for="profile-id">ID</label>
+            <input id="profile-id" maxlength="120" placeholder="ollama-cloud-gemma4">
+            <div class="hint">英数字、_、.、:、- が使えます。既存IDを変更すると別プロファイルとして保存されます。</div>
+
+            <label for="profile-label">Label</label>
+            <input id="profile-label" maxlength="200" placeholder="Ollama Cloud gemma4">
+
+            <label for="profile-base-url">Base URL</label>
+            <input id="profile-base-url" placeholder="https://ollama.com/v1">
+
+            <label for="profile-model">Model</label>
+            <input id="profile-model" maxlength="200" placeholder="gemma4:31b-cloud">
+
+            <label for="profile-api-key">API Key</label>
+            <input id="profile-api-key" type="password" placeholder="空欄なら既存キーを維持">
+
+            <div class="actions">
+                <button class="save" id="save">保存</button>
+                <button class="secondary" id="new-profile">新規</button>
+            </div>
+            <div id="form-result" class="result" style="display:none;"></div>
+        </section>
+
+        <section>
+            <div id="profiles" class="grid"></div>
+        </section>
+    </div>
 
     <script>
         let activeProfileId = null;
+        let profiles = [];
+        let editingOriginalId = null;
+
+        const form = {
+            id: document.getElementById('profile-id'),
+            label: document.getElementById('profile-label'),
+            baseUrl: document.getElementById('profile-base-url'),
+            model: document.getElementById('profile-model'),
+            apiKey: document.getElementById('profile-api-key'),
+            title: document.getElementById('form-title'),
+            result: document.getElementById('form-result')
+        };
 
         function esc(value) {
-            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
 
-        function loadProfiles() {
-            fetch('/api/ai/profiles', { cache: 'no-store' })
-                .then(r => r.json())
-                .then(data => {
-                    activeProfileId = data.activeProfileId;
-                    const profiles = data.profiles || [];
-                    const activeProfile = profiles.find(profile => profile.id === activeProfileId);
-                    document.getElementById('current').textContent = activeProfile
-                        ? '現在のAI: ' + (activeProfile.label || activeProfile.id) + ' / model: ' + activeProfile.model
-                        : '現在のAI: ' + activeProfileId;
-                    document.getElementById('profiles').innerHTML = profiles.map(profile => {
-                        const active = profile.id === activeProfileId;
-                        return '<div class="card ' + (active ? 'active' : '') + '">' +
-                            '<div class="row">' +
-                                '<div class="title">' + esc(profile.label || profile.id) + (active ? ' <span class="ok">使用中</span>' : '') + '</div>' +
-                                '<div>' +
-                                    '<button class="test" data-action="test" data-profile-id="' + esc(profile.id) + '">疎通テスト</button> ' +
-                                    '<button class="switch" data-action="switch" data-profile-id="' + esc(profile.id) + '" ' + (active ? 'disabled' : '') + '>切替</button>' +
-                                '</div>' +
-                            '</div>' +
-                            '<div class="meta">id: ' + esc(profile.id) + '</div>' +
-                            '<div class="meta">model: ' + esc(profile.model) + '</div>' +
-                            '<div class="meta">baseUrl: ' + esc(profile.baseUrl) + '</div>' +
-                            '<div id="result-' + esc(profile.id) + '" class="result" style="display:none;"></div>' +
-                            '</div>';
-                    }).join('');
-                    document.querySelectorAll('[data-action="test"]').forEach(button => {
-                        button.addEventListener('click', () => testProfile(button.dataset.profileId));
-                    });
-                    document.querySelectorAll('[data-action="switch"]').forEach(button => {
-                        button.addEventListener('click', () => setActive(button.dataset.profileId));
-                    });
-                })
-                .catch(e => {
-                    document.getElementById('current').innerHTML = '<span class="bad">Load failed: ' + esc(e.message) + '</span>';
-                });
+        async function requestJson(url, options = {}) {
+            const res = await fetch(url, options);
+            const text = await res.text();
+            const data = text ? JSON.parse(text) : {};
+            if (!res.ok) throw new Error(data.error || text || res.statusText);
+            return data;
         }
 
-        function setActive(profileId) {
-            fetch('/api/ai/active', {
+        async function loadProfiles() {
+            const data = await requestJson('/api/ai/profiles', { cache: 'no-store' });
+            activeProfileId = data.activeProfileId;
+            profiles = data.profiles || [];
+            const activeProfile = profiles.find(profile => profile.id === activeProfileId);
+            document.getElementById('current').textContent = activeProfile
+                ? '現在のAI: ' + (activeProfile.label || activeProfile.id) + ' / model: ' + activeProfile.model
+                : '現在のAI: ' + (activeProfileId || 'unknown');
+            renderProfiles();
+        }
+
+        function renderProfiles() {
+            document.getElementById('profiles').innerHTML = profiles.map(profile => {
+                const active = profile.id === activeProfileId;
+                return '<div class="card ' + (active ? 'active' : '') + '">' +
+                    '<div class="row">' +
+                        '<div class="title">' + esc(profile.label || profile.id) + (active ? ' <span class="ok">使用中</span>' : '') + '</div>' +
+                        '<div class="actions">' +
+                            '<button class="test" data-action="test" data-profile-id="' + esc(profile.id) + '">疎通テスト</button>' +
+                            '<button class="switch" data-action="switch" data-profile-id="' + esc(profile.id) + '" ' + (active ? 'disabled' : '') + '>切替</button>' +
+                            '<button class="edit" data-action="edit" data-profile-id="' + esc(profile.id) + '">編集</button>' +
+                            '<button class="delete" data-action="delete" data-profile-id="' + esc(profile.id) + '" ' + (active ? 'disabled' : '') + '>削除</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="meta">id: ' + esc(profile.id) + '</div>' +
+                    '<div class="meta">model: ' + esc(profile.model) + '</div>' +
+                    '<div class="meta">baseUrl: ' + esc(profile.baseUrl) + '</div>' +
+                    '<div class="meta">apiKey: ' + (profile.apiKey ? '設定済み' : '未設定') + '</div>' +
+                    '<div id="result-' + esc(profile.id) + '" class="result" style="display:none;"></div>' +
+                    '</div>';
+            }).join('');
+            document.querySelectorAll('[data-action="test"]').forEach(button => {
+                button.addEventListener('click', () => testProfile(button.dataset.profileId));
+            });
+            document.querySelectorAll('[data-action="switch"]').forEach(button => {
+                button.addEventListener('click', () => setActive(button.dataset.profileId));
+            });
+            document.querySelectorAll('[data-action="edit"]').forEach(button => {
+                button.addEventListener('click', () => editProfile(button.dataset.profileId));
+            });
+            document.querySelectorAll('[data-action="delete"]').forEach(button => {
+                button.addEventListener('click', () => deleteProfile(button.dataset.profileId));
+            });
+        }
+
+        function showFormResult(html) {
+            form.result.style.display = 'block';
+            form.result.innerHTML = html;
+        }
+
+        function resetForm() {
+            editingOriginalId = null;
+            form.title.textContent = 'AI Profile';
+            form.id.disabled = false;
+            form.id.value = '';
+            form.label.value = '';
+            form.baseUrl.value = '';
+            form.model.value = '';
+            form.apiKey.value = '';
+            form.result.style.display = 'none';
+        }
+
+        function editProfile(profileId) {
+            const profile = profiles.find(candidate => candidate.id === profileId);
+            if (!profile) return;
+            editingOriginalId = profile.id;
+            form.title.textContent = 'Edit AI Profile';
+            form.id.disabled = true;
+            form.id.value = profile.id;
+            form.label.value = profile.label || '';
+            form.baseUrl.value = profile.baseUrl || '';
+            form.model.value = profile.model || '';
+            form.apiKey.value = '';
+            showFormResult('APIキーを変更しない場合は空欄のまま保存してください。');
+        }
+
+        async function saveProfile() {
+            const profile = {
+                id: form.id.value.trim(),
+                label: form.label.value.trim(),
+                baseUrl: form.baseUrl.value.trim(),
+                model: form.model.value.trim(),
+                apiKey: form.apiKey.value
+            };
+            showFormResult('保存中...');
+            const data = await requestJson('/api/ai/profiles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(profile)
+            });
+            activeProfileId = data.activeProfileId;
+            profiles = data.profiles || [];
+            renderProfiles();
+            showFormResult('<span class="ok">保存しました</span>');
+            if (!editingOriginalId) {
+                form.apiKey.value = '';
+            }
+        }
+
+        async function setActive(profileId) {
+            const data = await requestJson('/api/ai/active', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ profileId })
-            })
-                .then(async r => {
-                    const text = await r.text();
-                    if (!r.ok) throw new Error(text);
-                    return JSON.parse(text);
-                })
-                .then(loadProfiles)
-                .catch(e => alert('切替失敗: ' + e.message));
+            });
+            activeProfileId = data.activeProfileId;
+            profiles = data.profiles || [];
+            renderProfiles();
+            const activeProfile = profiles.find(profile => profile.id === activeProfileId);
+            document.getElementById('current').textContent = activeProfile
+                ? '現在のAI: ' + (activeProfile.label || activeProfile.id) + ' / model: ' + activeProfile.model
+                : '現在のAI: ' + activeProfileId;
         }
 
-        function testProfile(profileId) {
+        async function deleteProfile(profileId) {
+            if (!confirm('AI profile "' + profileId + '" を削除しますか？')) return;
+            const data = await requestJson('/api/ai/profiles/' + encodeURIComponent(profileId), { method: 'DELETE' });
+            activeProfileId = data.activeProfileId;
+            profiles = data.profiles || [];
+            renderProfiles();
+            resetForm();
+        }
+
+        async function testProfile(profileId) {
             const box = document.getElementById('result-' + profileId);
             box.style.display = 'block';
             box.textContent = 'Testing...';
-            fetch('/api/ai/test', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileId })
-            })
-                .then(async r => {
-                    const text = await r.text();
-                    if (!r.ok) throw new Error(text);
-                    return JSON.parse(text);
-                })
-                .then(data => {
-                    box.innerHTML = '<span class="ok">OK</span> durationMs=' + esc(data.durationMs) + '\n' + esc(data.responsePreview || '');
-                })
-                .catch(e => {
-                    box.innerHTML = '<span class="bad">NG</span>\n' + esc(e.message);
+            try {
+                const data = await requestJson('/api/ai/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profileId })
                 });
+                box.innerHTML = '<span class="ok">OK</span> durationMs=' + esc(data.durationMs) + '\n' + esc(data.responsePreview || '');
+            } catch (e) {
+                box.innerHTML = '<span class="bad">NG</span>\n' + esc(e.message);
+            }
         }
 
-        loadProfiles();
+        document.getElementById('refresh').addEventListener('click', () => loadProfiles().catch(e => {
+            document.getElementById('current').innerHTML = '<span class="bad">Load failed: ' + esc(e.message) + '</span>';
+        }));
+        document.getElementById('save').addEventListener('click', () => saveProfile().catch(e => {
+            showFormResult('<span class="bad">保存失敗</span>\n' + esc(e.message));
+        }));
+        document.getElementById('new-profile').addEventListener('click', resetForm);
+
+        loadProfiles().catch(e => {
+            document.getElementById('current').innerHTML = '<span class="bad">Load failed: ' + esc(e.message) + '</span>';
+        });
     </script>
 </body>
 </html>

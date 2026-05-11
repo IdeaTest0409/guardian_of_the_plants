@@ -19,6 +19,7 @@ public class LiveStateService {
     private static final int MAX_USER_DISPLAY_CHARS = 120;
     private static final int MAX_ASSISTANT_DISPLAY_CHARS = 280;
     private static final String DEFAULT_POSE_PRESET = "auto";
+    private static final String DEFAULT_PLANT_IMAGE_SOURCE = "smartphone";
 
     private final AtomicReference<LiveState> state = new AtomicReference<>(
         new LiveState(
@@ -33,7 +34,7 @@ public class LiveStateService {
         )
     );
     private final AtomicReference<LiveSettings> settings = new AtomicReference<>(
-        new LiveSettings(DEFAULT_POSE_PRESET)
+        new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE)
     );
 
     public Map<String, Object> currentState() {
@@ -45,8 +46,17 @@ public class LiveStateService {
     }
 
     public Map<String, Object> updateSettings(Map<String, Object> request) {
-        String posePreset = request == null ? DEFAULT_POSE_PRESET : String.valueOf(request.getOrDefault("posePreset", DEFAULT_POSE_PRESET));
-        LiveSettings next = new LiveSettings(normalizePosePreset(posePreset));
+        LiveSettings previous = settings.get();
+        String posePreset = request == null
+            ? previous.posePreset()
+            : String.valueOf(request.getOrDefault("posePreset", previous.posePreset()));
+        String plantImageSource = request == null
+            ? previous.plantImageSource()
+            : String.valueOf(request.getOrDefault("plantImageSource", previous.plantImageSource()));
+        LiveSettings next = new LiveSettings(
+            normalizePosePreset(posePreset),
+            normalizePlantImageSource(plantImageSource)
+        );
         settings.set(next);
         return next.toMap();
     }
@@ -134,6 +144,9 @@ public class LiveStateService {
     }
 
     private String latestImageDataUrl(ChatRequest request, String fallback) {
+        if (!"smartphone".equals(settings.get().plantImageSource())) {
+            return fallback;
+        }
         if (request == null || request.messages() == null) return fallback;
         for (int i = request.messages().size() - 1; i >= 0; i--) {
             String found = findImageDataUrl(request.messages().get(i).content());
@@ -275,6 +288,14 @@ public class LiveStateService {
         };
     }
 
+    private String normalizePlantImageSource(String plantImageSource) {
+        if (plantImageSource == null || plantImageSource.isBlank()) return DEFAULT_PLANT_IMAGE_SOURCE;
+        return switch (plantImageSource.trim().toLowerCase()) {
+            case "smartphone", "pc" -> plantImageSource.trim().toLowerCase();
+            default -> DEFAULT_PLANT_IMAGE_SOURCE;
+        };
+    }
+
     private record LiveState(
         String sessionId,
         String status,
@@ -299,10 +320,11 @@ public class LiveStateService {
         }
     }
 
-    private record LiveSettings(String posePreset) {
+    private record LiveSettings(String posePreset, String plantImageSource) {
         Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("posePreset", posePreset);
+            map.put("plantImageSource", plantImageSource);
             return map;
         }
     }

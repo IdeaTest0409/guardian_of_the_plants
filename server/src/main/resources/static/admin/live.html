@@ -194,6 +194,16 @@
       <textarea id="message" maxlength="300" placeholder="PCから守護天使に話しかける"></textarea>
 
       <label for="plant-image-file">Plant image</label>
+      <div class="inline-actions">
+        <label>
+          <input type="radio" name="plant-image-source" value="smartphone" checked>
+          Smartphone
+        </label>
+        <label>
+          <input type="radio" name="plant-image-source" value="pc">
+          PC Upload
+        </label>
+      </div>
       <input id="plant-image-file" type="file" accept="image/*">
       <img id="plant-image-preview" class="image-preview" alt="Plant image preview">
 
@@ -288,6 +298,7 @@
     const autoTopic = document.getElementById('auto-topic');
     const autoTopicMinutes = document.getElementById('auto-topic-minutes');
     const posePreset = document.getElementById('pose-preset');
+    const plantImageSourceInputs = Array.from(document.querySelectorAll('input[name="plant-image-source"]'));
     const plantImageFile = document.getElementById('plant-image-file');
     const plantImagePreview = document.getElementById('plant-image-preview');
     const livePreview = document.getElementById('live-preview');
@@ -345,18 +356,40 @@
       const res = await fetch('/api/live/settings', { cache: 'no-store' });
       const settings = await res.json();
       posePreset.value = settings.posePreset || 'auto';
+      setPlantImageSource(settings.plantImageSource || 'smartphone');
     }
 
     async function saveSettings() {
+      const plantImageSource = currentPlantImageSource();
       const res = await fetch('/api/live/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posePreset: posePreset.value })
+        body: JSON.stringify({
+          posePreset: posePreset.value,
+          plantImageSource
+        })
       });
       const settings = await res.json();
       posePreset.value = settings.posePreset || 'auto';
-      setLog('pose preset: ' + posePreset.value);
+      setPlantImageSource(settings.plantImageSource || 'smartphone');
+      setLog('settings saved: pose=' + posePreset.value + ', imageSource=' + currentPlantImageSource());
       reloadLivePreview();
+    }
+
+    function currentPlantImageSource() {
+      const selected = plantImageSourceInputs.find(input => input.checked);
+      return selected ? selected.value : 'smartphone';
+    }
+
+    function setPlantImageSource(value) {
+      const normalized = value === 'pc' ? 'pc' : 'smartphone';
+      plantImageSourceInputs.forEach(input => {
+        input.checked = input.value === normalized;
+      });
+      const pcMode = normalized === 'pc';
+      plantImageFile.disabled = !pcMode;
+      document.getElementById('clear-image').disabled = !pcMode;
+      plantImageFile.title = pcMode ? '' : 'Smartphone image mode is active';
     }
 
     function reloadLivePreview() {
@@ -423,7 +456,8 @@
 
     async function sendText(text, conversationId) {
       setLog('sending...');
-      const content = selectedPlantImageDataUrl ? [
+      const shouldAttachPcImage = currentPlantImageSource() === 'pc' && selectedPlantImageDataUrl;
+      const content = shouldAttachPcImage ? [
         { type: 'text', text },
         { type: 'image_url', image_url: { url: selectedPlantImageDataUrl } }
       ] : text;
@@ -472,6 +506,11 @@
     }
 
     function readSelectedImage(file) {
+      if (currentPlantImageSource() !== 'pc') {
+        setLog('image source is Smartphone. Select PC Upload first.');
+        plantImageFile.value = '';
+        return;
+      }
       if (!file) {
         setPlantImageDataUrl(null);
         return;
@@ -591,12 +630,19 @@
       message.focus();
     });
     document.getElementById('clear-image').addEventListener('click', () => {
+      if (currentPlantImageSource() !== 'pc') {
+        setLog('image source is Smartphone. Select PC Upload first.');
+        return;
+      }
       plantImageFile.value = '';
       setPlantImageDataUrl(null);
       publishPlantImage(null).catch(e => setLog('image clear error: ' + String(e)));
     });
     plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    plantImageSourceInputs.forEach(input => {
+      input.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    });
     document.getElementById('ai-switch').addEventListener('click', () => switchAiProfile().catch(e => {
       aiResult.style.display = 'block';
       aiResult.innerHTML = '<span class="bad">Switch failed</span>\n' + esc(e.message);

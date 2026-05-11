@@ -4,6 +4,8 @@ import com.example.guardianplants.dto.AiProfile;
 import com.example.guardianplants.service.ProviderResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,10 +48,7 @@ public class AiProfileController {
     @PostMapping("/test")
     public ResponseEntity<Map<String, Object>> test(@RequestBody Map<String, String> body) {
         String profileId = body.get("profileId");
-        AiProfile profile = providerResolver.getProfiles().stream()
-            .filter(candidate -> candidate.id().equals(profileId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Unknown AI profile: " + profileId));
+        AiProfile profile = providerResolver.getProfile(profileId);
 
         String modelsUrl = profile.baseUrl().trim().replaceAll("/+$", "") + "/models";
         long started = System.currentTimeMillis();
@@ -76,6 +75,18 @@ public class AiProfileController {
             result.put("error", e.getMessage());
             return ResponseEntity.status(502).body(result);
         }
+    }
+
+    @PostMapping("/profiles")
+    public Map<String, Object> saveProfile(@RequestBody AiProfile profile) {
+        providerResolver.saveProfile(profile);
+        return profiles();
+    }
+
+    @DeleteMapping("/profiles/{profileId}")
+    public Map<String, Object> deleteProfile(@PathVariable String profileId) {
+        providerResolver.deleteProfile(profileId);
+        return profiles();
     }
 
     private String nullToEmpty(String value) {
