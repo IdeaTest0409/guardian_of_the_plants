@@ -549,6 +549,12 @@ the file is converted to a data URL in the browser and sent as an image part.
 a periodic guardian-initiated prompt.
 /admin/live.html has a 3D Pose selector. The selected preset is stored through
 GET/POST /api/live/settings and applied by /live/stage.html.
+The live preview iframe is reloaded with a cache-busting URL after pose changes
+so `/admin/live.html` reflects the same pose as direct `/live/stage.html`.
+AI profile selection and connection testing are now available directly in
+/admin/live.html. The built-in Ollama Cloud profile list includes
+`deepseek-v4-flash` using the same Ollama API key source as the other cloud
+profiles.
 The first pass did not visibly change the model posture because GLB animation
 or bone-axis assumptions could override the rest pose. The stage now disables
 the mixer for non-raw presets, applies stronger arm-bone rotations, and logs

@@ -160,6 +160,23 @@
       line-height: 1.5;
       margin-top: 8px;
     }
+    .inline-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .result {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 6px;
+      background: #f0f3f2;
+      color: #333;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
+    .ok { color: #166534; font-weight: 700; }
+    .bad { color: #991b1b; font-weight: 700; }
     @media (max-width: 920px) {
       main { grid-template-columns: 1fr; }
       .quick-grid { grid-template-columns: 1fr; }
@@ -209,6 +226,15 @@
         Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
       </div>
 
+      <label for="ai-profile">AI Model</label>
+      <select id="ai-profile"></select>
+      <div id="ai-current" class="hint">AI loading...</div>
+      <div class="inline-actions">
+        <button id="ai-switch" class="secondary">Apply AI</button>
+        <button id="ai-test" class="secondary">Test AI</button>
+      </div>
+      <div id="ai-result" class="result" style="display:none;"></div>
+
       <div class="row">
         <button id="send">Send</button>
         <button id="voice" class="secondary">Voice Input</button>
@@ -228,7 +254,7 @@
 
     <section>
       <h2>Current State <span id="status" class="status">loading</span></h2>
-      <iframe class="preview" src="/live/stage.html" title="Live stage preview"></iframe>
+      <iframe id="live-preview" class="preview" src="/live/stage.html" title="Live stage preview"></iframe>
       <dl class="state-grid">
         <dt>Updated</dt><dd id="updatedAt"></dd>
         <dt>User</dt><dd id="userText"></dd>
@@ -259,15 +285,25 @@
     const posePreset = document.getElementById('pose-preset');
     const plantImageFile = document.getElementById('plant-image-file');
     const plantImagePreview = document.getElementById('plant-image-preview');
+    const livePreview = document.getElementById('live-preview');
+    const aiProfile = document.getElementById('ai-profile');
+    const aiCurrent = document.getElementById('ai-current');
+    const aiResult = document.getElementById('ai-result');
     let recognition = null;
     let listening = false;
     let latestState = null;
     let lastAutoTopicAt = 0;
     let autoTopicSending = false;
     let selectedPlantImageDataUrl = null;
+    let aiProfiles = [];
+    let activeAiProfileId = null;
 
     function setLog(text) {
       log.textContent = text || '';
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function render(state) {
@@ -315,6 +351,63 @@
       const settings = await res.json();
       posePreset.value = settings.posePreset || 'auto';
       setLog('pose preset: ' + posePreset.value);
+      reloadLivePreview();
+    }
+
+    function reloadLivePreview() {
+      livePreview.src = '/live/stage.html?t=' + Date.now();
+    }
+
+    function renderAiProfiles(data) {
+      activeAiProfileId = data.activeProfileId;
+      aiProfiles = data.profiles || [];
+      aiProfile.innerHTML = aiProfiles.map(profile =>
+        '<option value="' + esc(profile.id) + '">' +
+          esc(profile.label || profile.id) + ' / ' + esc(profile.model) +
+        '</option>'
+      ).join('');
+      aiProfile.value = activeAiProfileId || '';
+      const active = aiProfiles.find(profile => profile.id === activeAiProfileId);
+      aiCurrent.textContent = active
+        ? 'Current AI: ' + (active.label || active.id) + ' / model: ' + active.model
+        : 'Current AI: ' + (activeAiProfileId || 'unknown');
+    }
+
+    async function loadAiProfiles() {
+      const res = await fetch('/api/ai/profiles', { cache: 'no-store' });
+      renderAiProfiles(await res.json());
+    }
+
+    async function switchAiProfile() {
+      const profileId = aiProfile.value;
+      if (!profileId) return;
+      aiResult.style.display = 'block';
+      aiResult.textContent = 'Switching AI...';
+      const res = await fetch('/api/ai/active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId })
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      renderAiProfiles(JSON.parse(text));
+      aiResult.innerHTML = '<span class="ok">AI switched</span>';
+    }
+
+    async function testAiProfile() {
+      const profileId = aiProfile.value;
+      if (!profileId) return;
+      aiResult.style.display = 'block';
+      aiResult.textContent = 'Testing AI...';
+      const res = await fetch('/api/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId })
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text);
+      const data = JSON.parse(text);
+      aiResult.innerHTML = '<span class="ok">OK</span> durationMs=' + esc(data.durationMs) + '\n' + esc(data.responsePreview || '');
     }
 
     async function send() {
@@ -484,10 +577,21 @@
     });
     plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    document.getElementById('ai-switch').addEventListener('click', () => switchAiProfile().catch(e => {
+      aiResult.style.display = 'block';
+      aiResult.innerHTML = '<span class="bad">Switch failed</span>\n' + esc(e.message);
+    }));
+    document.getElementById('ai-test').addEventListener('click', () => testAiProfile().catch(e => {
+      aiResult.style.display = 'block';
+      aiResult.innerHTML = '<span class="bad">Test failed</span>\n' + esc(e.message);
+    }));
 
     setupQuickChoices();
     setupVoiceInput();
     setupAutoTopic();
+    loadAiProfiles().catch(e => {
+      aiCurrent.innerHTML = '<span class="bad">AI load failed: ' + esc(e.message) + '</span>';
+    });
     refresh().catch(e => setLog(String(e)));
     setInterval(() => refresh().catch(() => {}), 5000);
   </script>

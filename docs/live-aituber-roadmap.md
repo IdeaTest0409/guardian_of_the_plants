@@ -97,6 +97,10 @@ itself.
 /admin/live.html has a 3D Pose selector backed by `/api/live/settings`.
 The selected preset is shared with `/live/stage.html`, including OBS or another
 browser tab.
+/admin/live.html also includes the AI profile selector and connection test that
+used to live on `/admin/ai.html`, so live operation can switch models from one
+page. Built-in Ollama Cloud profiles include `gemma4:31b-cloud` and
+`deepseek-v4-flash`.
 /live/stage.html reports browser-side 3D initialization and GLB load failures
 to `POST /api/logs` with category `LiveStage3D`, so they appear in
 `/admin/logs.html`. The App Logs table also shows a short `details` preview for

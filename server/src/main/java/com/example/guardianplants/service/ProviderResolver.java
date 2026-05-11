@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -82,18 +83,56 @@ public class ProviderResolver {
             try {
                 List<AiProfile> configured = objectMapper.readValue(profilesJson, new TypeReference<List<AiProfile>>() {});
                 if (!configured.isEmpty()) {
-                    return configured;
+                    return withBuiltInCloudProfiles(configured, baseUrl, apiKey);
                 }
             } catch (Exception e) {
                 throw new IllegalArgumentException("AI_PROFILES_JSON is invalid", e);
             }
         }
-        return List.of(new AiProfile(
+        return withBuiltInCloudProfiles(List.of(new AiProfile(
             "default",
             "Default AI",
             baseUrl,
             apiKey,
             model
+        )), baseUrl, apiKey);
+    }
+
+    private List<AiProfile> withBuiltInCloudProfiles(List<AiProfile> configured, String baseUrl, String apiKey) {
+        List<AiProfile> result = new ArrayList<>(configured);
+        String ollamaBaseUrl = configured.stream()
+            .filter(profile -> profile.baseUrl() != null && profile.baseUrl().contains("ollama.com"))
+            .map(AiProfile::baseUrl)
+            .findFirst()
+            .orElse(baseUrl);
+        String ollamaApiKey = configured.stream()
+            .filter(profile -> profile.baseUrl() != null && profile.baseUrl().contains("ollama.com"))
+            .map(AiProfile::apiKey)
+            .filter(key -> key != null && !key.isBlank())
+            .findFirst()
+            .orElse(apiKey);
+        addProfileIfMissing(result, new AiProfile(
+            "ollama-cloud-gemma4-31b",
+            "Ollama Cloud gemma4:31b",
+            ollamaBaseUrl,
+            ollamaApiKey,
+            "gemma4:31b-cloud"
         ));
+        addProfileIfMissing(result, new AiProfile(
+            "ollama-cloud-deepseek-v4-flash",
+            "Ollama Cloud deepseek-v4-flash",
+            ollamaBaseUrl,
+            ollamaApiKey,
+            "deepseek-v4-flash"
+        ));
+        return List.copyOf(result);
+    }
+
+    private void addProfileIfMissing(List<AiProfile> profiles, AiProfile profile) {
+        boolean exists = profiles.stream().anyMatch(candidate ->
+            candidate.id().equals(profile.id()) || candidate.model().equals(profile.model()));
+        if (!exists) {
+            profiles.add(profile);
+        }
     }
 }
