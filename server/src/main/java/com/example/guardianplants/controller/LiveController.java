@@ -66,6 +66,12 @@ public class LiveController {
         return liveStateService.updateSettings(request);
     }
 
+    @PostMapping("/plant-image")
+    public Map<String, Object> plantImage(@RequestBody Map<String, Object> request) {
+        Object value = request == null ? null : request.get("plantImageDataUrl");
+        return liveStateService.updatePlantImage(value == null ? null : String.valueOf(value));
+    }
+
     @PostMapping("/message")
     public LiveMessageResponse message(@RequestBody ChatRequest request) {
         var validationError = ApiValidation.validateChatRequest(request);

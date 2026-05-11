@@ -51,6 +51,23 @@ public class LiveStateService {
         return next.toMap();
     }
 
+    public Map<String, Object> updatePlantImage(String plantImageDataUrl) {
+        LiveState previous = state.get();
+        String nextImage = sanitizeImageDataUrl(plantImageDataUrl);
+        LiveState next = new LiveState(
+            previous.sessionId(),
+            previous.status(),
+            previous.userText(),
+            previous.assistantText(),
+            nextImage,
+            previous.audioUrl(),
+            null,
+            OffsetDateTime.now(ZoneOffset.UTC).toString()
+        );
+        state.set(next);
+        return next.toMap();
+    }
+
     public void markThinking(ChatRequest request) {
         LiveState previous = state.get();
         state.set(new LiveState(
@@ -123,6 +140,16 @@ public class LiveStateService {
             if (found != null) return found;
         }
         return fallback;
+    }
+
+    private String sanitizeImageDataUrl(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) return null;
+        if (!trimmed.startsWith("data:image/")) {
+            throw new IllegalArgumentException("plantImageDataUrl must be a data:image URL");
+        }
+        return trimmed;
     }
 
     @SuppressWarnings("unchecked")
@@ -242,7 +269,8 @@ public class LiveStateService {
     private String normalizePosePreset(String posePreset) {
         if (posePreset == null || posePreset.isBlank()) return DEFAULT_POSE_PRESET;
         return switch (posePreset.trim().toLowerCase()) {
-            case "auto", "relaxed", "arms-down", "raw", "small", "large" -> posePreset.trim().toLowerCase();
+            case "auto", "relaxed", "arms-down", "raw", "small", "large",
+                "wave", "happy-bounce", "dance-soft", "walk-random", "auto-random" -> posePreset.trim().toLowerCase();
             default -> DEFAULT_POSE_PRESET;
         };
     }

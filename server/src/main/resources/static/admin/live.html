@@ -221,6 +221,11 @@
         <option value="raw">Raw Model</option>
         <option value="small">Small</option>
         <option value="large">Large</option>
+        <option value="wave">Wave</option>
+        <option value="happy-bounce">Happy Bounce</option>
+        <option value="dance-soft">Dance Soft</option>
+        <option value="walk-random">Walk Random</option>
+        <option value="auto-random">Auto Random</option>
       </select>
       <div class="hint">
         Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
@@ -452,6 +457,20 @@
       }
     }
 
+    async function publishPlantImage(dataUrl) {
+      setLog(dataUrl ? 'updating stage image...' : 'clearing stage image...');
+      const res = await fetch('/api/live/plant-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plantImageDataUrl: dataUrl || null })
+      });
+      const state = await res.json();
+      if (!res.ok) throw new Error(JSON.stringify(state));
+      render(state);
+      reloadLivePreview();
+      setLog(dataUrl ? 'stage image updated' : 'stage image cleared');
+    }
+
     function readSelectedImage(file) {
       if (!file) {
         setPlantImageDataUrl(null);
@@ -471,8 +490,9 @@
       }
       const reader = new FileReader();
       reader.onload = () => {
-        setPlantImageDataUrl(String(reader.result || ''));
-        setLog('image selected: ' + file.name);
+        const dataUrl = String(reader.result || '');
+        setPlantImageDataUrl(dataUrl);
+        publishPlantImage(dataUrl).catch(e => setLog('image update error: ' + String(e)));
       };
       reader.onerror = () => {
         setLog('image error: failed to read file');
@@ -573,7 +593,7 @@
     document.getElementById('clear-image').addEventListener('click', () => {
       plantImageFile.value = '';
       setPlantImageDataUrl(null);
-      setLog('image cleared');
+      publishPlantImage(null).catch(e => setLog('image clear error: ' + String(e)));
     });
     plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
