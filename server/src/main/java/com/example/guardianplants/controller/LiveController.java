@@ -6,6 +6,7 @@ import com.example.guardianplants.dto.LiveMessageResponse;
 import com.example.guardianplants.dto.ServerMessage;
 import com.example.guardianplants.service.ChatService;
 import com.example.guardianplants.service.LiveAudioService;
+import com.example.guardianplants.service.LiveImageService;
 import com.example.guardianplants.service.LiveStateService;
 import com.example.guardianplants.service.RequestTraceService;
 import com.example.guardianplants.service.TtsService;
@@ -36,17 +37,20 @@ public class LiveController {
     private final ChatService chatService;
     private final TtsService ttsService;
     private final LiveAudioService liveAudioService;
+    private final LiveImageService liveImageService;
     private final LiveStateService liveStateService;
     private final RequestTraceService traceService;
 
     public LiveController(ChatService chatService,
                           TtsService ttsService,
                           LiveAudioService liveAudioService,
+                          LiveImageService liveImageService,
                           LiveStateService liveStateService,
                           RequestTraceService traceService) {
         this.chatService = chatService;
         this.ttsService = ttsService;
         this.liveAudioService = liveAudioService;
+        this.liveImageService = liveImageService;
         this.liveStateService = liveStateService;
         this.traceService = traceService;
     }
@@ -69,25 +73,37 @@ public class LiveController {
     @PostMapping("/plant-image")
     public Map<String, Object> plantImage(@RequestBody Map<String, Object> request) {
         Object value = request == null ? null : request.get("plantImageDataUrl");
-        return liveStateService.updatePlantImage(value == null ? null : String.valueOf(value));
+        String dataUrl = value == null ? null : liveImageService.compressDataUrl(String.valueOf(value));
+        return liveStateService.updatePlantImage(dataUrl);
     }
 
     @PostMapping("/message")
     public LiveMessageResponse message(@RequestBody ChatRequest request) {
-        var validationError = ApiValidation.validateChatRequest(request);
+        ChatRequest compressedRequest = liveImageService.compressImages(request);
+        String traceId = traceService.generateTraceId();
+        var validationError = ApiValidation.validateChatRequest(compressedRequest);
         if (validationError.isPresent()) {
-            throw new IllegalArgumentException(validationError.get());
+            String message = validationError.get();
+            traceService.recordError(traceId, "live", "validation", message);
+            Map<String, Object> state = liveStateService.fail(compressedRequest, message);
+            return new LiveMessageResponse(
+                UUID.randomUUID().toString(),
+                "",
+                null,
+                null,
+                "error",
+                state
+            );
         }
 
-        String traceId = traceService.generateTraceId();
-        String deviceId = request.deviceId() != null ? request.deviceId() : "unknown";
+        String deviceId = compressedRequest.deviceId() != null ? compressedRequest.deviceId() : "unknown";
         traceService.recordReceived(traceId, "live", "device=" + deviceId);
-        liveStateService.markThinking(request);
+        liveStateService.markThinking(compressedRequest);
 
         try {
-            String assistantText = chatService.complete(withServerPrompt(request), traceId);
+            String assistantText = chatService.complete(withServerPrompt(compressedRequest), traceId);
             String audioUrl = synthesizeLiveAudio(assistantText);
-            Map<String, Object> state = liveStateService.complete(request, assistantText, audioUrl);
+            Map<String, Object> state = liveStateService.complete(compressedRequest, assistantText, audioUrl);
             return new LiveMessageResponse(
                 UUID.randomUUID().toString(),
                 assistantText,
@@ -99,7 +115,7 @@ public class LiveController {
         } catch (RuntimeException e) {
             log.error("Live message failed", e);
             traceService.recordError(traceId, "live", "message", e.getMessage());
-            Map<String, Object> state = liveStateService.fail(request, e.getMessage());
+            Map<String, Object> state = liveStateService.fail(compressedRequest, e.getMessage());
             return new LiveMessageResponse(
                 UUID.randomUUID().toString(),
                 "",
