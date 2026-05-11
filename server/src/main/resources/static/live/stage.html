@@ -194,6 +194,17 @@
     let currentStatus = 'idle';
     let guardianModel = null;
     let mouthTargets = [];
+    let mixer = null;
+    let clock = null;
+    let audioContext = null;
+    let audioAnalyser = null;
+    let audioSamples = null;
+    let smoothedMouth = 0;
+    let modelInfoLogged = false;
+    let THREE_NS = null;
+    let liveSettings = { posePreset: 'auto' };
+    let currentPosePreset = 'auto';
+    let boneBaseRotations = [];
 
     const audio = document.getElementById('live-audio');
     const audioToggle = document.getElementById('audio-toggle');
@@ -201,6 +212,7 @@
       audioEnabled = true;
       audioToggle.classList.add('enabled');
       audioToggle.textContent = 'Audio Enabled';
+      setupAudioAnalysis();
       audio.play().catch(() => {});
     });
 
@@ -212,6 +224,7 @@
       if (!audioEnabled || !url || url === lastAudioUrl) return;
       lastAudioUrl = url;
       audio.src = url + '?t=' + Date.now();
+      setupAudioAnalysis();
       audio.play().catch(() => {});
     }
 
@@ -259,6 +272,19 @@
         });
     }
 
+    function loadSettings() {
+      fetch('/api/live/settings', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(settings => {
+          const previousPreset = liveSettings.posePreset;
+          liveSettings = {
+            posePreset: settings.posePreset || 'auto'
+          };
+          if (liveSettings.posePreset !== previousPreset) applyPosePreset();
+        })
+        .catch(() => {});
+    }
+
     function errorDetails(error, extra = {}) {
       return {
         errorName: error?.name || '',
@@ -285,13 +311,158 @@
       }).catch(() => {});
     }
 
+    function logClientInfo(message, details = {}) {
+      fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: 'browser-live-stage',
+          appVersion: 'web',
+          severity: 'INFO',
+          category: 'LiveStage3D',
+          message,
+          details: {
+            userAgent: navigator.userAgent,
+            url: location.href,
+            ...details
+          }
+        })
+      }).catch(() => {});
+    }
+
+    function setupAudioAnalysis() {
+      if (audioAnalyser) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        audioContext = audioContext || new AudioContextClass();
+        const source = audioContext.createMediaElementSource(audio);
+        audioAnalyser = audioContext.createAnalyser();
+        audioAnalyser.fftSize = 1024;
+        audioSamples = new Uint8Array(audioAnalyser.fftSize);
+        source.connect(audioAnalyser);
+        audioAnalyser.connect(audioContext.destination);
+      } catch (e) {
+        logClientError('Audio analyser setup failed', e);
+      }
+    }
+
+    function currentAudioMouthValue() {
+      if (!audioAnalyser || audio.paused || audio.ended) return 0;
+      audioAnalyser.getByteTimeDomainData(audioSamples);
+      let sum = 0;
+      for (let i = 0; i < audioSamples.length; i++) {
+        const centered = (audioSamples[i] - 128) / 128;
+        sum += centered * centered;
+      }
+      const rms = Math.sqrt(sum / audioSamples.length);
+      const target = Math.min(1, Math.max(0, (rms - 0.015) * 8.5));
+      smoothedMouth = smoothedMouth * 0.72 + target * 0.28;
+      return smoothedMouth;
+    }
+
+    function inspectModel(gltf, model) {
+      const boneNames = [];
+      const morphNames = [];
+      model.traverse((node) => {
+        if (node.isBone && boneNames.length < 80) boneNames.push(node.name);
+        if (node.morphTargetDictionary) {
+          Object.keys(node.morphTargetDictionary).forEach((name) => {
+            if (morphNames.length < 80 && !morphNames.includes(name)) morphNames.push(name);
+          });
+        }
+      });
+      if (!modelInfoLogged) {
+        modelInfoLogged = true;
+        logClientInfo('angel_egna.glb inspected', {
+          animations: gltf.animations.map((clip) => clip.name),
+          boneNames,
+          morphNames,
+          mouthTargetCount: mouthTargets.length
+        });
+      }
+    }
+
+    function normalizeModelToGround(model) {
+      const box = new THREE_NS.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE_NS.Vector3());
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= box.min.y;
+    }
+
+    function captureBasePose(model) {
+      boneBaseRotations = [];
+      model.traverse((node) => {
+        if (node.isBone) {
+          boneBaseRotations.push({ node, rotation: node.rotation.clone() });
+        }
+      });
+    }
+
+    function resetBasePose() {
+      boneBaseRotations.forEach(({ node, rotation }) => {
+        node.rotation.copy(rotation);
+      });
+    }
+
+    function applyRestPose(model, strength = 1) {
+      resetBasePose();
+      model.traverse((node) => {
+        if (!node.isBone || !node.name) return;
+        const name = node.name.toLowerCase();
+        const left = name.includes('left') || name.includes('_l') || name.endsWith('.l');
+        const right = name.includes('right') || name.includes('_r') || name.endsWith('.r');
+        if (!(left || right)) return;
+        if (name.includes('upperarm') || name.includes('upper_arm') || name.includes('shoulder')) {
+          node.rotation.z += (left ? 0.82 : -0.82) * strength;
+          node.rotation.x += 0.08 * strength;
+        }
+        if (name.includes('lowerarm') || name.includes('forearm')) {
+          node.rotation.z += (left ? 0.18 : -0.18) * strength;
+        }
+      });
+    }
+
+    function poseConfig() {
+      switch (liveSettings.posePreset || 'auto') {
+        case 'relaxed':
+          return { scale: 1.38, y: -1.05, useMixer: true, restStrength: 0.55, sway: 0.65 };
+        case 'arms-down':
+          return { scale: 1.38, y: -1.05, useMixer: false, restStrength: 1.15, sway: 0.45 };
+        case 'raw':
+          return { scale: 1.38, y: -1.05, useMixer: true, restStrength: 0, sway: 0.5 };
+        case 'small':
+          return { scale: 1.18, y: -1.0, useMixer: true, restStrength: 0.55, sway: 0.55 };
+        case 'large':
+          return { scale: 1.55, y: -1.12, useMixer: true, restStrength: 0.55, sway: 0.55 };
+        case 'auto':
+        default:
+          return { scale: 1.38, y: -1.05, useMixer: true, restStrength: 0.55, sway: 0.65 };
+      }
+    }
+
+    function applyPosePreset() {
+      const nextPreset = liveSettings.posePreset || 'auto';
+      const config = poseConfig();
+      if (guardianModel) {
+        resetBasePose();
+        if (config.restStrength > 0) applyRestPose(guardianModel, config.restStrength);
+      }
+      if (guardianModel) guardianModel.scale.setScalar(config.scale);
+      if (mixer) mixer.timeScale = config.useMixer ? 1 : 0;
+      currentPosePreset = nextPreset;
+    }
+
     async function startGuardian3d() {
       try {
         const THREE = await import('https://esm.sh/three@0.164.1');
+        THREE_NS = THREE;
         const { GLTFLoader } = await import('https://esm.sh/three@0.164.1/examples/jsm/loaders/GLTFLoader.js');
         const canvas = document.getElementById('guardian-canvas');
         const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
         const scene = new THREE.Scene();
+        clock = new THREE.Clock();
         const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
         camera.position.set(0, 1.15, 3.5);
 
@@ -320,9 +491,8 @@
           '/live/assets/models/angel_egna.glb',
           (gltf) => {
             guardianModel = gltf.scene;
-            guardianModel.scale.setScalar(1.38);
+            guardianModel.scale.setScalar(poseConfig().scale);
             guardianModel.position.set(0, 0, 0);
-            root.add(guardianModel);
             mouthTargets = [];
             guardianModel.traverse((node) => {
               if (node.isMesh) {
@@ -330,13 +500,33 @@
                 if (node.morphTargetDictionary && node.morphTargetInfluences) {
                   Object.entries(node.morphTargetDictionary).forEach(([name, index]) => {
                     const normalized = name.toLowerCase();
-                    if (normalized.includes('mth') || ['a', 'i', 'u', 'e', 'o'].includes(normalized)) {
+                    if (
+                      normalized.includes('mth') ||
+                      normalized.includes('mouth') ||
+                      normalized.includes('jaw') ||
+                      normalized.includes('aa') ||
+                      normalized.includes('ih') ||
+                      normalized.includes('ou') ||
+                      normalized.includes('ee') ||
+                      normalized.includes('oh') ||
+                      ['a', 'i', 'u', 'e', 'o'].includes(normalized)
+                    ) {
                       mouthTargets.push({ node, index });
                     }
                   });
                 }
               }
             });
+            normalizeModelToGround(guardianModel);
+            root.add(guardianModel);
+            captureBasePose(guardianModel);
+            if (gltf.animations && gltf.animations.length > 0) {
+              mixer = new THREE.AnimationMixer(guardianModel);
+              const idleClip = gltf.animations.find((clip) => /idle|wait|stand|loop/i.test(clip.name)) || gltf.animations[0];
+              mixer.clipAction(idleClip).reset().play();
+            }
+            applyPosePreset();
+            inspectModel(gltf, guardianModel);
             document.getElementById('model-loading').style.display = 'none';
           },
           undefined,
@@ -352,16 +542,19 @@
         );
 
         function animate(time) {
+          const delta = clock ? clock.getDelta() : 0.016;
           const t = time * 0.001;
           const thinking = currentStatus === 'thinking';
           const speaking = !audio.paused && !audio.ended;
           const error = currentStatus === 'error' || currentStatus === 'offline';
-          root.rotation.y = Math.PI + Math.sin(t * 0.65) * 0.12;
-          root.position.y = -0.95 + Math.sin(t * (thinking ? 2.0 : 1.0)) * 0.045;
+          const config = poseConfig();
+          if (mixer && config.useMixer) mixer.update(delta);
+          root.rotation.y = Math.PI + Math.sin(t * 0.65) * 0.12 * config.sway;
+          root.position.y = config.y + Math.sin(t * (thinking ? 1.45 : 0.75)) * 0.026 * config.sway;
           if (guardianModel) {
-            guardianModel.rotation.z = error ? Math.sin(t * 4.0) * 0.025 : Math.sin(t * 0.9) * 0.018;
+            guardianModel.rotation.z = error ? Math.sin(t * 3.0) * 0.018 : Math.sin(t * 0.7) * 0.01 * config.sway;
           }
-          const mouth = speaking ? (Math.sin(t * 18) + 1) * 0.45 : 0;
+          const mouth = speaking ? currentAudioMouthValue() : 0;
           mouthTargets.forEach(({ node, index }) => {
             node.morphTargetInfluences[index] = mouth;
           });
@@ -383,7 +576,9 @@
 
     startGuardian3d();
     loadState();
+    loadSettings();
     setInterval(loadState, 1000);
+    setInterval(loadSettings, 2000);
   </script>
 </body>
 </html>

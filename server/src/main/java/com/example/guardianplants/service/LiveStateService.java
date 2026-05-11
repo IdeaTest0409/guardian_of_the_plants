@@ -18,6 +18,7 @@ public class LiveStateService {
 
     private static final int MAX_USER_DISPLAY_CHARS = 120;
     private static final int MAX_ASSISTANT_DISPLAY_CHARS = 280;
+    private static final String DEFAULT_POSE_PRESET = "auto";
 
     private final AtomicReference<LiveState> state = new AtomicReference<>(
         new LiveState(
@@ -31,9 +32,23 @@ public class LiveStateService {
             OffsetDateTime.now(ZoneOffset.UTC).toString()
         )
     );
+    private final AtomicReference<LiveSettings> settings = new AtomicReference<>(
+        new LiveSettings(DEFAULT_POSE_PRESET)
+    );
 
     public Map<String, Object> currentState() {
         return state.get().toMap();
+    }
+
+    public Map<String, Object> currentSettings() {
+        return settings.get().toMap();
+    }
+
+    public Map<String, Object> updateSettings(Map<String, Object> request) {
+        String posePreset = request == null ? DEFAULT_POSE_PRESET : String.valueOf(request.getOrDefault("posePreset", DEFAULT_POSE_PRESET));
+        LiveSettings next = new LiveSettings(normalizePosePreset(posePreset));
+        settings.set(next);
+        return next.toMap();
     }
 
     public void markThinking(ChatRequest request) {
@@ -224,6 +239,14 @@ public class LiveStateService {
         return sanitized.substring(0, maxChars) + "...";
     }
 
+    private String normalizePosePreset(String posePreset) {
+        if (posePreset == null || posePreset.isBlank()) return DEFAULT_POSE_PRESET;
+        return switch (posePreset.trim().toLowerCase()) {
+            case "auto", "relaxed", "arms-down", "raw", "small", "large" -> posePreset.trim().toLowerCase();
+            default -> DEFAULT_POSE_PRESET;
+        };
+    }
+
     private record LiveState(
         String sessionId,
         String status,
@@ -244,6 +267,14 @@ public class LiveStateService {
             map.put("audioUrl", audioUrl);
             map.put("error", error);
             map.put("updatedAt", updatedAt);
+            return map;
+        }
+    }
+
+    private record LiveSettings(String posePreset) {
+        Map<String, Object> toMap() {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("posePreset", posePreset);
             return map;
         }
     }

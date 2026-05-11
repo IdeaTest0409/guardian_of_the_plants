@@ -56,6 +56,16 @@ public class LiveController {
         return liveStateService.currentState();
     }
 
+    @GetMapping("/settings")
+    public Map<String, Object> settings() {
+        return liveStateService.currentSettings();
+    }
+
+    @PostMapping("/settings")
+    public Map<String, Object> settings(@RequestBody Map<String, Object> request) {
+        return liveStateService.updateSettings(request);
+    }
+
     @PostMapping("/message")
     public LiveMessageResponse message(@RequestBody ChatRequest request) {
         var validationError = ApiValidation.validateChatRequest(request);

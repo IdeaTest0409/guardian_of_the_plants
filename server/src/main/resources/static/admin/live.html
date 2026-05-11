@@ -88,6 +88,29 @@
       border: 1px solid #c9d8d2;
       font-weight: 700;
     }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 10px;
+      border: 1px solid #d7e3de;
+      border-radius: 8px;
+      background: #f6faf8;
+    }
+    .toggle-row input[type="checkbox"] {
+      width: auto;
+      transform: scale(1.15);
+    }
+    .toggle-row label {
+      margin: 0;
+      font-weight: 700;
+    }
+    .toggle-row select {
+      width: auto;
+      min-width: 92px;
+      margin-left: auto;
+    }
     .status {
       display: inline-block;
       padding: 5px 9px;
@@ -146,6 +169,32 @@
       <label>Quick Choices</label>
       <div id="quick-grid" class="quick-grid"></div>
 
+      <div class="toggle-row">
+        <input id="auto-topic" type="checkbox">
+        <label for="auto-topic">Auto topic</label>
+        <select id="auto-topic-minutes" title="Auto topic interval">
+          <option value="1">1 min</option>
+          <option value="3" selected>3 min</option>
+          <option value="5">5 min</option>
+        </select>
+      </div>
+      <div class="hint">
+        Auto topic is sent from this admin page while it stays open.
+      </div>
+
+      <label for="pose-preset">3D Pose</label>
+      <select id="pose-preset">
+        <option value="auto">Auto</option>
+        <option value="relaxed">Relaxed</option>
+        <option value="arms-down">Arms Down</option>
+        <option value="raw">Raw Model</option>
+        <option value="small">Small</option>
+        <option value="large">Large</option>
+      </select>
+      <div class="hint">
+        Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
+      </div>
+
       <div class="row">
         <button id="send">Send</button>
         <button id="voice" class="secondary">Voice Input</button>
@@ -190,14 +239,21 @@
     const log = document.getElementById('log');
     const message = document.getElementById('message');
     const voiceButton = document.getElementById('voice');
+    const autoTopic = document.getElementById('auto-topic');
+    const autoTopicMinutes = document.getElementById('auto-topic-minutes');
+    const posePreset = document.getElementById('pose-preset');
     let recognition = null;
     let listening = false;
+    let latestState = null;
+    let lastAutoTopicAt = 0;
+    let autoTopicSending = false;
 
     function setLog(text) {
       log.textContent = text || '';
     }
 
     function render(state) {
+      latestState = state;
       document.getElementById('status').textContent = state.status || 'idle';
       document.getElementById('updatedAt').textContent = state.updatedAt || '';
       document.getElementById('userText').textContent = state.userText || '';
@@ -223,15 +279,37 @@
     async function refresh() {
       const res = await fetch('/api/live/state', { cache: 'no-store' });
       render(await res.json());
+      await refreshSettings();
+    }
+
+    async function refreshSettings() {
+      const res = await fetch('/api/live/settings', { cache: 'no-store' });
+      const settings = await res.json();
+      posePreset.value = settings.posePreset || 'auto';
+    }
+
+    async function saveSettings() {
+      const res = await fetch('/api/live/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ posePreset: posePreset.value })
+      });
+      const settings = await res.json();
+      posePreset.value = settings.posePreset || 'auto';
+      setLog('pose preset: ' + posePreset.value);
     }
 
     async function send() {
       const text = message.value.trim();
       if (!text) return;
+      await sendText(text, 'admin-live');
+    }
+
+    async function sendText(text, conversationId) {
       setLog('sending...');
       const body = {
         deviceId: 'admin-live',
-        conversationId: 'admin-live',
+        conversationId,
         messages: [
           { role: 'user', content: text }
         ],
@@ -246,6 +324,48 @@
       setLog(JSON.stringify(payload, null, 2));
       if (payload.state) render(payload.state);
       await refresh();
+    }
+
+    async function maybeSendAutoTopic() {
+      if (!autoTopic.checked || autoTopicSending) return;
+      const intervalMs = Number(autoTopicMinutes.value || 3) * 60 * 1000;
+      const now = Date.now();
+      if (now - lastAutoTopicAt < intervalMs) return;
+      if (latestState && latestState.status === 'thinking') return;
+      autoTopicSending = true;
+      lastAutoTopicAt = now;
+      localStorage.setItem('guardianLiveAutoTopicAt', String(lastAutoTopicAt));
+      try {
+        await sendText(
+          '今の植物の様子を見て、守護天使から自然に短く話題を振ってください。',
+          'admin-live-auto'
+        );
+        setLog('auto topic sent');
+      } catch (e) {
+        setLog('auto topic error: ' + String(e));
+      } finally {
+        autoTopicSending = false;
+      }
+    }
+
+    function setupAutoTopic() {
+      autoTopic.checked = localStorage.getItem('guardianLiveAutoTopic') === 'true';
+      autoTopicMinutes.value = localStorage.getItem('guardianLiveAutoTopicMinutes') || autoTopicMinutes.value;
+      lastAutoTopicAt = Number(localStorage.getItem('guardianLiveAutoTopicAt') || '0');
+      autoTopic.addEventListener('change', () => {
+        localStorage.setItem('guardianLiveAutoTopic', String(autoTopic.checked));
+        if (autoTopic.checked) {
+          lastAutoTopicAt = Date.now();
+          localStorage.setItem('guardianLiveAutoTopicAt', String(lastAutoTopicAt));
+          setLog('auto topic enabled');
+        } else {
+          setLog('auto topic disabled');
+        }
+      });
+      autoTopicMinutes.addEventListener('change', () => {
+        localStorage.setItem('guardianLiveAutoTopicMinutes', autoTopicMinutes.value);
+      });
+      setInterval(() => maybeSendAutoTopic(), 15000);
     }
 
     function setupVoiceInput() {
@@ -295,9 +415,11 @@
       message.value = '';
       message.focus();
     });
+    posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
 
     setupQuickChoices();
     setupVoiceInput();
+    setupAutoTopic();
     refresh().catch(e => setLog(String(e)));
     setInterval(() => refresh().catch(() => {}), 5000);
   </script>
