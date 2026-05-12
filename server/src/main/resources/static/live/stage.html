@@ -109,22 +109,29 @@
       font-size: clamp(12px, 1vw, 16px);
       text-shadow: 0 2px 8px rgba(0,0,0,0.7);
     }
-    .audio-button {
+    .audio-control {
       position: absolute;
       right: 4.5%;
       top: 4.2%;
-      padding: 10px 14px;
+      width: min(210px, 22vw);
+      padding: 9px 12px;
       border: 1px solid rgba(255, 255, 255, 0.32);
       border-radius: 8px;
       background: rgba(9, 16, 14, 0.72);
       color: #f7fbf8;
       font-size: clamp(13px, 1vw, 18px);
       font-weight: 700;
-      cursor: pointer;
     }
-    .audio-button.enabled {
-      color: #112018;
-      background: #9ee7d0;
+    .audio-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      white-space: nowrap;
+    }
+    .audio-slider {
+      width: 100%;
+      accent-color: #9ee7d0;
     }
     .user-text {
       position: absolute;
@@ -191,7 +198,13 @@
       <div id="plant-placeholder" class="plant-placeholder">植物画像を待っています</div>
     </section>
     <div class="shade"></div>
-    <button id="audio-toggle" class="audio-button" type="button">Enable Audio</button>
+    <div class="audio-control">
+      <div class="audio-label">
+        <span>Audio</span>
+        <span id="audio-volume-label">100%</span>
+      </div>
+      <input id="audio-volume" class="audio-slider" type="range" min="0" max="100" step="1" value="100" aria-label="Audio volume">
+    </div>
     <aside class="guardian-area">
       <canvas id="guardian-canvas"></canvas>
       <div id="guardian-fallback" class="guardian-fallback">天</div>
@@ -208,7 +221,8 @@
   <script type="module">
     let lastUpdatedAt = null;
     let lastAudioUrl = null;
-    let audioEnabled = false;
+    let stageVolume = readStoredStageVolume();
+    let audioEnabled = stageVolume > 0;
     let currentStatus = 'idle';
     let latestAutoStatus = null;
     let latestAutoStatusReceivedAt = 0;
@@ -233,7 +247,8 @@
 
     const audio = document.getElementById('live-audio');
     const bgmAudio = document.getElementById('bgm-audio');
-    const audioToggle = document.getElementById('audio-toggle');
+    const audioVolume = document.getElementById('audio-volume');
+    const audioVolumeLabel = document.getElementById('audio-volume-label');
     audio.addEventListener('ended', () => {
       fetch('/api/live/auto/audio-ended', {
         method: 'POST',
@@ -241,15 +256,45 @@
         body: JSON.stringify({ audioUrl: lastAudioUrl })
       }).catch(() => {});
     });
-    audioToggle.addEventListener('click', () => {
-      audioEnabled = true;
-      audioToggle.classList.add('enabled');
-      audioToggle.textContent = 'Audio Enabled';
+    audioVolume.value = String(Math.round(stageVolume * 100));
+    updateAudioVolumeLabel();
+    audioVolume.addEventListener('input', () => {
+      setStageVolume(Number(audioVolume.value || 0) / 100, true);
+    });
+
+    function readStoredStageVolume() {
+      const raw = localStorage.getItem('liveStageVolume');
+      const value = raw == null ? 1 : Number(raw);
+      return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 1;
+    }
+
+    function setStageVolume(value, shouldStartAudio) {
+      stageVolume = Math.max(0, Math.min(1, value));
+      audioEnabled = stageVolume > 0;
+      localStorage.setItem('liveStageVolume', String(stageVolume));
+      audio.volume = stageVolume;
+      updateAudioVolumeLabel();
+      applyBgmDucking(!audio.paused && !audio.ended);
+      if (!audioEnabled) {
+        audio.pause();
+        bgmAudio.pause();
+        return;
+      }
       setupAudioAnalysis();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
-      applyBgmSettings(true);
-      audio.play().catch(() => {});
-    });
+      applyBgmSettings(shouldStartAudio);
+      if (shouldStartAudio && audio.src) {
+        audio.play().catch(() => {
+          audioVolumeLabel.textContent = 'click/adjust';
+        });
+      }
+    }
+
+    function updateAudioVolumeLabel() {
+      audioVolumeLabel.textContent = stageVolume <= 0 ? 'Off' : Math.round(stageVolume * 100) + '%';
+    }
+
+    setStageVolume(stageVolume, false);
 
     function textOrFallback(value, fallback) {
       return value && String(value).trim() ? String(value) : fallback;
@@ -260,6 +305,7 @@
       lastAudioUrl = url;
       audio.src = url + '?t=' + Date.now();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
+      audio.volume = stageVolume;
       applyBgmDucking(true);
       setupAudioAnalysis();
       audio.play().catch(() => {});
@@ -359,7 +405,8 @@
 
     function applyBgmDucking(isSpeaking) {
       const baseVolume = Math.max(0, Math.min(1, Number(liveSettings.bgmVolume || 0.15)));
-      bgmAudio.volume = isSpeaking ? Math.max(0.03, baseVolume * 0.45) : baseVolume;
+      const mixedVolume = baseVolume * stageVolume;
+      bgmAudio.volume = isSpeaking ? Math.max(0.03, mixedVolume * 0.45) : mixedVolume;
     }
 
     function formatCountdown(seconds) {
