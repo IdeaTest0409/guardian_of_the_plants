@@ -39,7 +39,17 @@ public class AutoTalkService {
         new AutoTalkTopic("plant_care", "育て方", true, 2, "水やり、日当たり、温度、置き場所、根腐れ予防など育て方の話をする。"),
         new AutoTalkTopic("nearby_species", "近い品種", true, 1, "サンスベリアに近い品種や似た観葉植物の話を、写真の植物と関係づけて短く話す。"),
         new AutoTalkTopic("plant_trivia", "植物豆知識", true, 1, "植物の仕組み、葉、根、乾燥への強さなどの豆知識をやさしく話す。"),
-        new AutoTalkTopic("seasonal", "季節の話", true, 1, "季節、気温、湿度、室内環境に合わせた植物の見守りポイントを話す。")
+        new AutoTalkTopic("seasonal", "季節の話", true, 1, "季節、気温、湿度、室内環境に合わせた植物の見守りポイントを話す。"),
+        new AutoTalkTopic("leaf_color", "葉色チェック", true, 2, "葉の緑、黄色み、斑の入り方、つやを観察して、落ち着いた一言にする。"),
+        new AutoTalkTopic("watering_signs", "水やりサイン", true, 2, "土の乾き、葉の張り、季節を踏まえて、水やりしすぎない観点で話す。"),
+        new AutoTalkTopic("light_balance", "光の具合", true, 1, "窓辺の明るさ、直射日光、日陰、葉焼けや徒長の話を短くする。"),
+        new AutoTalkTopic("soil_and_pot", "土と鉢", true, 1, "鉢、土、排水、根の呼吸、植え替えの雰囲気についてやさしく話す。"),
+        new AutoTalkTopic("growth_memory", "成長の記録", true, 1, "前より伸びたかもしれない葉、姿勢、変化を見守るように話す。"),
+        new AutoTalkTopic("sansevieria_family", "サンスベリア仲間", true, 1, "ローレンティー、ハニー、スタッキーなどサンスベリアの仲間に軽く触れる。"),
+        new AutoTalkTopic("indoor_air", "室内環境", true, 1, "空気の流れ、室温、湿度、エアコンの風など室内管理の話をする。"),
+        new AutoTalkTopic("gentle_encouragement", "やさしい励まし", true, 1, "植物と世話をする人を静かに励ます、配信用の短い言葉にする。"),
+        new AutoTalkTopic("small_discovery", "小さな発見", true, 1, "写真の端や背景も含めて、小さな変化や発見を一つ拾って話す。"),
+        new AutoTalkTopic("care_mistake_prevention", "失敗予防", true, 1, "根腐れ、寒さ、強すぎる日差し、水のやりすぎなどを怖がらせずに注意する。")
     );
 
     private final ChatService chatService;
@@ -60,7 +70,7 @@ public class AutoTalkService {
     private boolean enabled;
     private boolean generating;
     private int targetReadyCount = 3;
-    private int talkIntervalSeconds = 180;
+    private int talkIntervalSeconds = 60;
     private int minGapSeconds = 30;
     private int autoPlayCount;
     private Instant lastPlayedAt;

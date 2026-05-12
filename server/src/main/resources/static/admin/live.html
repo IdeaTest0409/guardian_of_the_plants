@@ -337,8 +337,10 @@
           <input id="auto-topic" type="checkbox">
           <label for="auto-topic">Auto mode</label>
           <select id="auto-topic-minutes" title="Auto topic interval">
-            <option value="1">1 min</option>
-            <option value="3" selected>3 min</option>
+            <option value="0.5">30 sec</option>
+            <option value="0.75">45 sec</option>
+            <option value="1" selected>1 min</option>
+            <option value="3">3 min</option>
             <option value="5">5 min</option>
           </select>
         </div>
@@ -405,8 +407,8 @@
         <label for="bgm-volume">BGM volume</label>
         <select id="bgm-volume">
           <option value="0.05">5%</option>
-          <option value="0.10">10%</option>
-          <option value="0.15" selected>15%</option>
+          <option value="0.10" selected>10%</option>
+          <option value="0.15">15%</option>
           <option value="0.20">20%</option>
           <option value="0.25">25%</option>
           <option value="0.30">30%</option>
@@ -578,7 +580,7 @@
       posePreset.value = settings.posePreset || 'auto';
       audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
       bgmEnabled.checked = Boolean(settings.bgmEnabled);
-      bgmVolume.value = String(Number(settings.bgmVolume || 0.15).toFixed(2));
+      bgmVolume.value = String(Number(settings.bgmVolume || 0.10).toFixed(2));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
     }
 
@@ -592,7 +594,7 @@
           audioPlaybackRate: Number(audioPlaybackRate.value || 1),
           bgmEnabled: bgmEnabled.checked,
           bgmTrack: bgmTrack.value || 'peaceful_ambient',
-          bgmVolume: Number(bgmVolume.value || 0.15),
+          bgmVolume: Number(bgmVolume.value || 0.10),
           plantImageSource
         })
       });
@@ -601,7 +603,7 @@
       posePreset.value = settings.posePreset || 'auto';
       audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
       bgmEnabled.checked = Boolean(settings.bgmEnabled);
-      bgmVolume.value = String(Number(settings.bgmVolume || 0.15).toFixed(2));
+      bgmVolume.value = String(Number(settings.bgmVolume || 0.10).toFixed(2));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
       setLog('settings saved: pose=' + posePreset.value + ', speed=' + audioPlaybackRate.value + ', bgm=' + bgmEnabled.checked + ', imageSource=' + currentPlantImageSource());
       reloadLivePreview();
@@ -864,7 +866,7 @@
       latestAutoStatus = data;
       latestAutoStatusReceivedAt = Date.now();
       autoTopic.checked = Boolean(data.enabled);
-      autoTopicMinutes.value = String(Math.max(1, Math.round(Number(data.talkIntervalSeconds || 180) / 60)));
+      autoTopicMinutes.value = String(Number(data.talkIntervalSeconds || 60) / 60);
       targetReadyCount.value = String(data.targetReadyCount || 3);
       autoMinGapSeconds.value = String(data.minGapSeconds ?? 30);
       renderAutoCountdown();
@@ -906,7 +908,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          talkIntervalSeconds: Number(autoTopicMinutes.value || 3) * 60,
+          talkIntervalSeconds: Number(autoTopicMinutes.value || 1) * 60,
           targetReadyCount: Number(targetReadyCount.value || 3),
           minGapSeconds: Number(autoMinGapSeconds.value || 30)
         })

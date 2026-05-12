@@ -26,8 +26,8 @@ public class LiveStateService {
     private static final String DEFAULT_POSE_PRESET = "auto";
     private static final String DEFAULT_PLANT_IMAGE_SOURCE = "smartphone";
     private static final double DEFAULT_AUDIO_PLAYBACK_RATE = 1.0;
-    private static final boolean DEFAULT_BGM_ENABLED = false;
-    private static final double DEFAULT_BGM_VOLUME = 0.15;
+    private static final boolean DEFAULT_BGM_ENABLED = true;
+    private static final double DEFAULT_BGM_VOLUME = 0.10;
     private static final String DEFAULT_BGM_TRACK = "peaceful_ambient";
     private static final String SETTING_POSE_PRESET = "live.posePreset";
     private static final String SETTING_PLANT_IMAGE_SOURCE = "live.plantImageSource";
