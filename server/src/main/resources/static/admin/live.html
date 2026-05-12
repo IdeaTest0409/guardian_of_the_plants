@@ -333,6 +333,15 @@
           <option value="4">4 items</option>
           <option value="5">5 items</option>
         </select>
+        <label for="auto-min-gap-seconds">Minimum gap after playback</label>
+        <select id="auto-min-gap-seconds">
+          <option value="0">0 sec</option>
+          <option value="15">15 sec</option>
+          <option value="30" selected>30 sec</option>
+          <option value="60">60 sec</option>
+          <option value="90">90 sec</option>
+          <option value="120">120 sec</option>
+        </select>
         <div class="inline-actions">
           <button id="auto-refill" class="secondary" type="button">Refill</button>
           <button id="auto-skip" class="secondary" type="button">Play Next</button>
@@ -362,6 +371,8 @@
           <option value="walk-random">Walk Random</option>
           <option value="auto-random">Auto Random</option>
         </select>
+        <label for="audio-playback-rate">Audio speed</label>
+        <select id="audio-playback-rate"></select>
         <div class="hint">
           Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
         </div>
@@ -421,9 +432,11 @@
     const autoTopic = document.getElementById('auto-topic');
     const autoTopicMinutes = document.getElementById('auto-topic-minutes');
     const targetReadyCount = document.getElementById('target-ready-count');
+    const autoMinGapSeconds = document.getElementById('auto-min-gap-seconds');
     const autoQueueStatus = document.getElementById('auto-queue-status');
     const autoQueueList = document.getElementById('auto-queue-list');
     const posePreset = document.getElementById('pose-preset');
+    const audioPlaybackRate = document.getElementById('audio-playback-rate');
     const plantImageSourceInputs = Array.from(document.querySelectorAll('input[name="plant-image-source"]'));
     const plantImageFile = document.getElementById('plant-image-file');
     const plantImagePreview = document.getElementById('plant-image-preview');
@@ -472,6 +485,16 @@
       });
     }
 
+    function setupAudioSpeedOptions() {
+      const options = [];
+      for (let value = 5; value <= 40; value++) {
+        const rate = (value / 10).toFixed(1);
+        options.push('<option value="' + rate + '">' + rate + 'x</option>');
+      }
+      audioPlaybackRate.innerHTML = options.join('');
+      audioPlaybackRate.value = '1.0';
+    }
+
     async function refresh() {
       const res = await fetch('/api/live/state', { cache: 'no-store' });
       render(await res.json());
@@ -482,6 +505,7 @@
       const res = await fetch('/api/live/settings', { cache: 'no-store' });
       const settings = await res.json();
       posePreset.value = settings.posePreset || 'auto';
+      audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
     }
 
@@ -492,13 +516,15 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           posePreset: posePreset.value,
+          audioPlaybackRate: Number(audioPlaybackRate.value || 1),
           plantImageSource
         })
       });
       const settings = await res.json();
       posePreset.value = settings.posePreset || 'auto';
+      audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
-      setLog('settings saved: pose=' + posePreset.value + ', imageSource=' + currentPlantImageSource());
+      setLog('settings saved: pose=' + posePreset.value + ', speed=' + audioPlaybackRate.value + ', imageSource=' + currentPlantImageSource());
       reloadLivePreview();
     }
 
@@ -727,6 +753,7 @@
         ' | ready=' + latestAutoStatus.readyCount + '/' + latestAutoStatus.targetReadyCount +
         ' | generating=' + latestAutoStatus.generatingCount +
         ' | errors=' + latestAutoStatus.errorCount +
+        ' | gap=' + (latestAutoStatus.minGapSeconds ?? 30) + 's' +
         ' | next=' + next;
     }
 
@@ -736,6 +763,7 @@
       autoTopic.checked = Boolean(data.enabled);
       autoTopicMinutes.value = String(Math.max(1, Math.round(Number(data.talkIntervalSeconds || 180) / 60)));
       targetReadyCount.value = String(data.targetReadyCount || 3);
+      autoMinGapSeconds.value = String(data.minGapSeconds ?? 30);
       renderAutoCountdown();
 
       const queue = data.queue || [];
@@ -775,7 +803,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           talkIntervalSeconds: Number(autoTopicMinutes.value || 3) * 60,
-          targetReadyCount: Number(targetReadyCount.value || 3)
+          targetReadyCount: Number(targetReadyCount.value || 3),
+          minGapSeconds: Number(autoMinGapSeconds.value || 30)
         })
       });
       const data = await res.json();
@@ -799,6 +828,7 @@
       });
       autoTopicMinutes.addEventListener('change', () => saveAutoSettings().catch(e => setLog(String(e))));
       targetReadyCount.addEventListener('change', () => saveAutoSettings().catch(e => setLog(String(e))));
+      autoMinGapSeconds.addEventListener('change', () => saveAutoSettings().catch(e => setLog(String(e))));
       document.getElementById('auto-refill').addEventListener('click', () => postAutoAction('refill').catch(e => setLog(String(e))));
       document.getElementById('auto-skip').addEventListener('click', () => postAutoAction('skip').catch(e => setLog(String(e))));
       document.getElementById('auto-clear').addEventListener('click', () => postAutoAction('clear').catch(e => setLog(String(e))));
@@ -867,6 +897,7 @@
     });
     plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    audioPlaybackRate.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
     plantImageSourceInputs.forEach(input => {
       input.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
     });
@@ -880,6 +911,7 @@
     }));
 
     setupQuickChoices();
+    setupAudioSpeedOptions();
     setupVoiceInput();
     setupAutoTopic();
     loadAiProfiles().catch(e => {

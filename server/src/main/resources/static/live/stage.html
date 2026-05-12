@@ -201,7 +201,7 @@
     let smoothedMouth = 0;
     let modelInfoLogged = false;
     let THREE_NS = null;
-    let liveSettings = { posePreset: 'auto' };
+    let liveSettings = { posePreset: 'auto', audioPlaybackRate: 1 };
     let currentPosePreset = 'auto';
     let boneBaseRotations = [];
     let poseBones = [];
@@ -217,6 +217,7 @@
       audioToggle.classList.add('enabled');
       audioToggle.textContent = 'Audio Enabled';
       setupAudioAnalysis();
+      audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       audio.play().catch(() => {});
     });
 
@@ -228,6 +229,7 @@
       if (!audioEnabled || !url || url === lastAudioUrl) return;
       lastAudioUrl = url;
       audio.src = url + '?t=' + Date.now();
+      audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       setupAudioAnalysis();
       audio.play().catch(() => {});
     }
@@ -282,8 +284,10 @@
         .then(settings => {
           const previousPreset = liveSettings.posePreset;
           liveSettings = {
-            posePreset: settings.posePreset || 'auto'
+            posePreset: settings.posePreset || 'auto',
+            audioPlaybackRate: Number(settings.audioPlaybackRate || 1)
           };
+          audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
           if (liveSettings.posePreset !== previousPreset) applyPosePreset();
         })
         .catch(() => {});

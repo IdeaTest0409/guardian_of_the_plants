@@ -20,6 +20,7 @@ public class LiveStateService {
     private static final int MAX_ASSISTANT_DISPLAY_CHARS = 280;
     private static final String DEFAULT_POSE_PRESET = "auto";
     private static final String DEFAULT_PLANT_IMAGE_SOURCE = "smartphone";
+    private static final double DEFAULT_AUDIO_PLAYBACK_RATE = 1.0;
 
     private final AtomicReference<LiveState> state = new AtomicReference<>(
         new LiveState(
@@ -34,7 +35,7 @@ public class LiveStateService {
         )
     );
     private final AtomicReference<LiveSettings> settings = new AtomicReference<>(
-        new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE)
+        new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE, DEFAULT_AUDIO_PLAYBACK_RATE)
     );
 
     public Map<String, Object> currentState() {
@@ -53,9 +54,13 @@ public class LiveStateService {
         String plantImageSource = request == null
             ? previous.plantImageSource()
             : String.valueOf(request.getOrDefault("plantImageSource", previous.plantImageSource()));
+        double audioPlaybackRate = request == null
+            ? previous.audioPlaybackRate()
+            : doubleValue(request.get("audioPlaybackRate"), previous.audioPlaybackRate());
         LiveSettings next = new LiveSettings(
             normalizePosePreset(posePreset),
-            normalizePlantImageSource(plantImageSource)
+            normalizePlantImageSource(plantImageSource),
+            normalizeAudioPlaybackRate(audioPlaybackRate)
         );
         settings.set(next);
         return next.toMap();
@@ -296,6 +301,23 @@ public class LiveStateService {
         };
     }
 
+    private double doubleValue(Object value, double fallback) {
+        if (value instanceof Number n) return n.doubleValue();
+        if (value instanceof String s && !s.isBlank()) {
+            try {
+                return Double.parseDouble(s.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private double normalizeAudioPlaybackRate(double value) {
+        double clamped = Math.max(0.5, Math.min(4.0, value));
+        return Math.round(clamped * 10.0) / 10.0;
+    }
+
     private record LiveState(
         String sessionId,
         String status,
@@ -320,11 +342,12 @@ public class LiveStateService {
         }
     }
 
-    private record LiveSettings(String posePreset, String plantImageSource) {
+    private record LiveSettings(String posePreset, String plantImageSource, double audioPlaybackRate) {
         Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("posePreset", posePreset);
             map.put("plantImageSource", plantImageSource);
+            map.put("audioPlaybackRate", audioPlaybackRate);
             return map;
         }
     }

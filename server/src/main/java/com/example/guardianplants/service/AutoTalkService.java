@@ -42,6 +42,9 @@ public class AutoTalkService {
     private boolean generating;
     private int targetReadyCount = 3;
     private int talkIntervalSeconds = 180;
+    private int minGapSeconds = 30;
+    private int autoPlayCount;
+    private Instant lastPlayedAt;
     private Instant nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
     private static final int START_PLAY_DELAY_SECONDS = 5;
 
@@ -75,9 +78,10 @@ public class AutoTalkService {
         if (body != null) {
             targetReadyCount = clamp(intValue(body.get("targetReadyCount"), targetReadyCount), 1, 5);
             talkIntervalSeconds = clamp(intValue(body.get("talkIntervalSeconds"), talkIntervalSeconds), 20, 600);
+            minGapSeconds = clamp(intValue(body.get("minGapSeconds"), minGapSeconds), 0, 300);
         }
         if (nextPlayAt.isBefore(Instant.now())) {
-            nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
+            nextPlayAt = nextScheduledPlayAt(Instant.now().plusSeconds(talkIntervalSeconds));
         }
         requestRefill();
         return snapshot();
@@ -233,8 +237,12 @@ public class AutoTalkService {
             .findFirst()
             .orElse(null);
         if (item == null) {
-            nextPlayAt = Instant.now().plusSeconds(10);
+            nextPlayAt = nextScheduledPlayAt(Instant.now().plusSeconds(10));
             requestRefill();
+            return;
+        }
+        if (!manualSkip && Instant.now().isBefore(nextAllowedPlayAt())) {
+            nextPlayAt = nextAllowedPlayAt();
             return;
         }
         ChatRequest displayRequest = new ChatRequest(
@@ -246,7 +254,11 @@ public class AutoTalkService {
         liveStateService.complete(displayRequest, item.assistantText(), item.audioUrl());
         item.status("used");
         item.usedAt(now());
-        nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
+        if (!manualSkip) {
+            autoPlayCount++;
+        }
+        lastPlayedAt = Instant.now();
+        nextPlayAt = nextScheduledPlayAt(lastPlayedAt.plusSeconds(talkIntervalSeconds));
         requestRefill();
     }
 
@@ -281,10 +293,24 @@ public class AutoTalkService {
 
     private void scheduleSoonIfReady() {
         if (!enabled || readyCount() <= 0) return;
+        if (autoPlayCount > 0 || lastPlayedAt != null) {
+            nextPlayAt = nextScheduledPlayAt(nextPlayAt);
+            return;
+        }
         Instant soon = Instant.now().plusSeconds(START_PLAY_DELAY_SECONDS);
         if (nextPlayAt.isAfter(soon)) {
             nextPlayAt = soon;
         }
+    }
+
+    private Instant nextAllowedPlayAt() {
+        if (lastPlayedAt == null) return Instant.now();
+        return lastPlayedAt.plusSeconds(minGapSeconds);
+    }
+
+    private Instant nextScheduledPlayAt(Instant candidate) {
+        Instant allowed = nextAllowedPlayAt();
+        return candidate.isBefore(allowed) ? allowed : candidate;
     }
 
     private Map<String, Object> snapshot() {
@@ -293,6 +319,9 @@ public class AutoTalkService {
         result.put("generating", generating);
         result.put("targetReadyCount", targetReadyCount);
         result.put("talkIntervalSeconds", talkIntervalSeconds);
+        result.put("minGapSeconds", minGapSeconds);
+        result.put("autoPlayCount", autoPlayCount);
+        result.put("lastPlayedAt", lastPlayedAt == null ? null : lastPlayedAt.toString());
         result.put("nextPlayAt", nextPlayAt.toString());
         result.put("nextPlayInSeconds", Math.max(0, Instant.now().until(nextPlayAt, ChronoUnit.SECONDS)));
         result.put("readyCount", readyCount());
