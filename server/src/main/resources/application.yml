@@ -38,3 +38,6 @@ guardian:
     app-logs-days: ${RETENTION_APP_LOGS_DAYS:30}
     chat-history-days: ${RETENTION_CHAT_HISTORY_DAYS:90}
     prune-on-app-start-every: ${RETENTION_PRUNE_ON_APP_START_EVERY:100}
+  admin-auth:
+    username: ${ADMIN_AUTH_USERNAME:admin}
+    password: ${ADMIN_AUTH_PASSWORD:}

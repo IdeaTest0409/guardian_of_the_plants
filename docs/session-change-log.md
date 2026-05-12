@@ -608,3 +608,29 @@ Also refreshed:
 docs/README.md
 docs/development-status.md
 ```
+
+### Admin Security and Live Control Layout
+
+Added optional Basic Auth for admin surfaces and sensitive live/AI write APIs.
+
+Behavior:
+
+```text
+Set ADMIN_AUTH_PASSWORD in .env to enable Basic Auth.
+ADMIN_AUTH_USERNAME defaults to admin.
+/admin/* is protected.
+/api/ai/* is protected.
+POST /api/live/message, /api/live/settings, and /api/live/plant-image are protected.
+DELETE /api/logs is protected.
+The public live stage, live state reads, live audio, and Android app log POSTs remain available.
+```
+
+Also reorganized `/admin/live.html` into clearer sections:
+
+```text
+Message
+Plant Image
+Automation
+Stage
+AI
+```

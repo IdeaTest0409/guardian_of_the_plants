@@ -259,19 +259,21 @@ Recommended priority order:
    Note: local `gemma4:e2b` is useful for low-cost text, but image diagnosis
    may need a vision-capable model.
 
-4. Add admin security.
+4. Complete admin security.
 
-   The admin pages are currently convenient but should be protected before
-   wider use:
+   Basic Auth is available for admin pages and admin write APIs when
+   `ADMIN_AUTH_PASSWORD` is set in `.env`:
 
    ```text
    /admin/logs.html
    /admin/ai.html
-   future /admin/live.html
+   /admin/live.html
+   /api/ai/*
+   selected /api/live write APIs
    ```
 
-   Minimum recommended controls are Basic Auth or token auth, HTTPS, rate
-   limits, and confirmation for destructive actions.
+   Remaining recommended controls are HTTPS, rate limits, and confirmation for
+   destructive actions.
 
 ## AP Server Update Commands
 

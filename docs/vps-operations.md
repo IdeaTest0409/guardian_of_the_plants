@@ -258,9 +258,10 @@ cat guardian_plants_backup.sql | docker exec -i guardian-postgres psql -U guardi
 - It is acceptable for the server container to reach the external AI provider.
 - Keep `.env` off Git.
 - Store `AI_API_KEY` only on the server side in `.env`.
+- Set `ADMIN_AUTH_PASSWORD` in `.env` to enable Basic Auth for `/admin/*`,
+  `/api/ai/*`, selected live write APIs, and log deletion.
 - Tune `RATE_LIMIT_*` and `RETENTION_*` values in the VPS `.env` if real usage changes.
 - Add HTTPS/TLS.
-- Add authentication for `/admin/logs.html`.
 - Add rate limiting for chat and TTS endpoints.
 - On Windows, run `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\secret-scan.ps1`
   before public pushes when secrets changed.
