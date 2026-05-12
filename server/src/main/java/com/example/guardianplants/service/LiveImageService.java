@@ -29,8 +29,8 @@ import org.springframework.stereotype.Service;
 public class LiveImageService {
 
     private static final int TARGET_DATA_URL_CHARS = ApiValidation.MAX_CHAT_MESSAGE_CHARS - 20_000;
-    private static final int[] MAX_DIMENSIONS = {1024, 896, 768, 640, 512};
-    private static final float[] JPEG_QUALITIES = {0.82f, 0.74f, 0.66f, 0.58f};
+    private static final int[] MAX_DIMENSIONS = {1024, 896, 768, 640, 512, 384, 320, 256};
+    private static final float[] JPEG_QUALITIES = {0.82f, 0.74f, 0.66f, 0.58f, 0.48f, 0.38f};
     private static final String JPEG_PREFIX = "data:image/jpeg;base64,";
 
     private final ObjectMapper objectMapper;
@@ -50,9 +50,6 @@ public class LiveImageService {
     public String compressDataUrl(String dataUrl) {
         if (dataUrl == null || !dataUrl.trim().startsWith("data:image/")) return dataUrl;
         String normalized = dataUrl.trim();
-        if (normalized.startsWith("data:image/png")) {
-            return normalized;
-        }
         if (normalized.length() <= TARGET_DATA_URL_CHARS && normalized.startsWith(JPEG_PREFIX)) {
             return normalized;
         }
@@ -75,7 +72,7 @@ public class LiveImageService {
                     }
                 }
             }
-            return best;
+            return best.length() <= TARGET_DATA_URL_CHARS ? best : encodeJpegDataUrl(scaleToMaxDimension(source, 192), 0.32f);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
