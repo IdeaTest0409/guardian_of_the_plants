@@ -64,6 +64,13 @@ POST /api/ai/active
 POST /api/ai/test
 POST /api/chat
 POST /api/live/message
+GET  /api/live/auto
+POST /api/live/auto/settings
+POST /api/live/auto/start
+POST /api/live/auto/stop
+POST /api/live/auto/refill
+POST /api/live/auto/skip
+POST /api/live/auto/clear
 GET  /api/live/state
 GET  /api/live/audio/{id}
 POST /api/tts/synthesize
@@ -91,9 +98,11 @@ choice buttons similar to the smartphone shortcuts.
 /admin/live.html can attach a local plant image file to the next PC chat
 message. The browser converts it to a data URL and sends it through the same
 image part format used by the smartphone flow.
-/admin/live.html also has an Auto topic toggle. While the admin page is open,
-it can periodically send a short prompt so the guardian starts a topic by
-itself.
+/admin/live.html also has an Auto mode toggle. The server keeps a small queue
+of generated guardian replies and VoiceVOX audio files, then plays ready items
+in sequence. This is the first step toward long-running unattended talk.
+/admin/live.html groups controls into collapsible sections so live operation
+can keep the message controls visible while hiding less-used settings.
 /admin/live.html has a 3D Pose selector backed by `/api/live/settings`.
 The selected preset is shared with `/live/stage.html`, including OBS or another
 browser tab.
@@ -105,11 +114,50 @@ page. Built-in Ollama Cloud profiles include `gemma4:31b-cloud` and
 to `POST /api/logs` with category `LiveStage3D`, so they appear in
 `/admin/logs.html`. The App Logs table also shows a short `details` preview for
 browser error messages, user agent, and model URL.
+/admin/logs.html has a Live only filter for live request flows, live chat,
+TTS, and browser-stage logs.
 /live/stage.html normalizes the GLB to the ground, plays an idle animation if
 the GLB has one, lowers arm bones as a fallback, and drives mouth morphs from
 the actual audio waveform instead of a fixed timer.
 For non-raw pose presets, the stage disables GLB animation mixer playback and
 applies stronger arm-bone rotations so pose changes are visibly testable.
+```
+
+## Server Auto Mode
+
+Auto mode is intentionally server-side. The browser control page monitors and
+commands it, but the queue continues to exist in the Spring Boot process while
+the server is running.
+
+Current behavior:
+
+```text
+Default target stock: 3 ready items
+Default interval:     3 minutes
+Generation flow:      AI text -> VoiceVOX audio -> /api/live/audio/{id}
+Playback flow:        ready item -> LiveStateService -> /live/stage.html
+Plant image:          current /api/live/state plantImageDataUrl is attached if present
+```
+
+Admin operations:
+
+```text
+/admin/live.html Automation section
+  Auto mode: start/stop server auto talk
+  Interval: time between played items
+  Ready stock: number of pre-generated items to keep ready
+  Refill: ask the server to generate another item when below stock
+  Play Next: immediately play the next ready item
+  Clear Queue: remove queued ready/error/used items
+```
+
+Important notes:
+
+```text
+The queue is currently in memory and is lost when the server container restarts.
+Only one item is generated at a time to avoid overlapping AI and VoiceVOX load.
+If VoiceVOX fails, the text can still be queued without audio.
+Admin Basic Auth protects /api/live/auto* when ADMIN_AUTH_PASSWORD is set.
 ```
 
 The live stage is intended for OBS browser-source capture. It is not yet the

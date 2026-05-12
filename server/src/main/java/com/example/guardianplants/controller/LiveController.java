@@ -5,6 +5,7 @@ import com.example.guardianplants.dto.ChatRequest;
 import com.example.guardianplants.dto.LiveMessageResponse;
 import com.example.guardianplants.dto.ServerMessage;
 import com.example.guardianplants.service.ChatService;
+import com.example.guardianplants.service.AutoTalkService;
 import com.example.guardianplants.service.LiveAudioService;
 import com.example.guardianplants.service.LiveImageService;
 import com.example.guardianplants.service.LiveStateService;
@@ -35,6 +36,7 @@ public class LiveController {
     private static final Logger log = LoggerFactory.getLogger(LiveController.class);
 
     private final ChatService chatService;
+    private final AutoTalkService autoTalkService;
     private final TtsService ttsService;
     private final LiveAudioService liveAudioService;
     private final LiveImageService liveImageService;
@@ -42,12 +44,14 @@ public class LiveController {
     private final RequestTraceService traceService;
 
     public LiveController(ChatService chatService,
+                          AutoTalkService autoTalkService,
                           TtsService ttsService,
                           LiveAudioService liveAudioService,
                           LiveImageService liveImageService,
                           LiveStateService liveStateService,
                           RequestTraceService traceService) {
         this.chatService = chatService;
+        this.autoTalkService = autoTalkService;
         this.ttsService = ttsService;
         this.liveAudioService = liveAudioService;
         this.liveImageService = liveImageService;
@@ -125,6 +129,41 @@ public class LiveController {
                 state
             );
         }
+    }
+
+    @GetMapping("/auto")
+    public Map<String, Object> autoStatus() {
+        return autoTalkService.status();
+    }
+
+    @PostMapping("/auto/settings")
+    public Map<String, Object> autoSettings(@RequestBody Map<String, Object> request) {
+        return autoTalkService.updateSettings(request);
+    }
+
+    @PostMapping("/auto/start")
+    public Map<String, Object> autoStart() {
+        return autoTalkService.start();
+    }
+
+    @PostMapping("/auto/stop")
+    public Map<String, Object> autoStop() {
+        return autoTalkService.stop();
+    }
+
+    @PostMapping("/auto/refill")
+    public Map<String, Object> autoRefill() {
+        return autoTalkService.refill();
+    }
+
+    @PostMapping("/auto/skip")
+    public Map<String, Object> autoSkip() {
+        return autoTalkService.skip();
+    }
+
+    @PostMapping("/auto/clear")
+    public Map<String, Object> autoClear() {
+        return autoTalkService.clear();
     }
 
     @GetMapping("/audio/{id}")

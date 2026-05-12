@@ -634,3 +634,41 @@ Automation
 Stage
 AI
 ```
+
+### Admin Live and Log Viewer UI Cleanup
+
+Cleaned up admin operation screens:
+
+```text
+/admin/live.html uses collapsible sections so the left control pane is shorter.
+The Send / Voice Input / Clear buttons remain near the top.
+Common quick choice labels and auto-topic prompt text are readable Japanese.
+/admin/logs.html has a Live only filter for live flows, live chat, TTS, and
+LiveStage3D/browser-stage app logs.
+```
+
+### Server-Side Auto Talk Queue
+
+Moved the live auto-talk direction from browser-timer prompts toward a
+server-managed queue.
+
+Behavior:
+
+```text
+Spring Boot keeps an in-memory AutoTalk queue.
+The server pre-generates short guardian replies with the active AI profile.
+VoiceVOX audio is generated ahead of playback when possible.
+/admin/live.html can monitor ready/generating/error counts and recent queue
+items.
+/admin/live.html can start/stop auto mode, change interval, change target stock,
+refill, play the next ready item, and clear the queue.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/service/AutoTalkService.java
+server/src/main/java/com/example/guardianplants/controller/LiveController.java
+server/src/main/java/com/example/guardianplants/AdminAuthFilter.java
+server/src/main/resources/static/admin/live.html
+```

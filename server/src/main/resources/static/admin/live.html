@@ -35,7 +35,7 @@
       font-size: 18px;
     }
     .control-group {
-      padding: 14px 0;
+      padding: 12px 0;
       border-top: 1px solid #e4ebe8;
     }
     .control-group:first-of-type {
@@ -46,6 +46,25 @@
       margin: 0 0 10px;
       font-size: 15px;
       color: #2b3f37;
+    }
+    details.control-group summary {
+      cursor: pointer;
+      font-weight: 800;
+      color: #2b3f37;
+      list-style-position: inside;
+      padding: 2px 0 8px;
+    }
+    .primary-actions {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 12px;
+      padding: 10px 0;
+      background: #fff;
+      border-bottom: 1px solid #e4ebe8;
     }
     label {
       display: block;
@@ -203,17 +222,23 @@
   <main>
     <section>
       <h2>PC Chat</h2>
-      <div class="control-group">
-        <h3>Message</h3>
+      <div class="primary-actions">
+        <button id="send">Send</button>
+        <button id="voice" class="secondary">Voice Input</button>
+        <button id="clear" class="warn">Clear</button>
+        <button id="clear-image" class="secondary">Clear Image</button>
+      </div>
+      <details class="control-group" open>
+        <summary>Message</summary>
         <label for="message">Message</label>
         <textarea id="message" maxlength="300" placeholder="PCから守護天使に話しかける"></textarea>
 
         <label>Quick Choices</label>
         <div id="quick-grid" class="quick-grid"></div>
-      </div>
+      </details>
 
-      <div class="control-group">
-        <h3>Plant Image</h3>
+      <details class="control-group">
+        <summary>Plant Image</summary>
         <label for="plant-image-file">Plant image</label>
         <div class="inline-actions">
           <label>
@@ -227,26 +252,40 @@
         </div>
         <input id="plant-image-file" type="file" accept="image/*">
         <img id="plant-image-preview" class="image-preview" alt="Plant image preview">
-      </div>
+      </details>
 
-      <div class="control-group">
-        <h3>Automation</h3>
+      <details class="control-group">
+        <summary>Automation</summary>
         <div class="toggle-row">
           <input id="auto-topic" type="checkbox">
-          <label for="auto-topic">Auto topic</label>
+          <label for="auto-topic">Auto mode</label>
           <select id="auto-topic-minutes" title="Auto topic interval">
             <option value="1">1 min</option>
             <option value="3" selected>3 min</option>
             <option value="5">5 min</option>
           </select>
         </div>
-        <div class="hint">
-          Auto topic is sent from this admin page while it stays open.
+        <label for="target-ready-count">Ready stock</label>
+        <select id="target-ready-count">
+          <option value="2">2 items</option>
+          <option value="3" selected>3 items</option>
+          <option value="4">4 items</option>
+          <option value="5">5 items</option>
+        </select>
+        <div class="inline-actions">
+          <button id="auto-refill" class="secondary" type="button">Refill</button>
+          <button id="auto-skip" class="secondary" type="button">Play Next</button>
+          <button id="auto-clear" class="warn" type="button">Clear Queue</button>
         </div>
-      </div>
+        <div class="hint">
+          Auto mode is handled by the server. It keeps several AI replies and audio files ready, then plays them in sequence.
+        </div>
+        <div id="auto-queue-status" class="log"></div>
+        <div id="auto-queue-list" class="result"></div>
+      </details>
 
-      <div class="control-group">
-        <h3>Stage</h3>
+      <details class="control-group">
+        <summary>Stage</summary>
         <label for="pose-preset">3D Pose</label>
         <select id="pose-preset">
           <option value="auto">Auto</option>
@@ -264,10 +303,10 @@
         <div class="hint">
           Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
         </div>
-      </div>
+      </details>
 
-      <div class="control-group">
-        <h3>AI</h3>
+      <details class="control-group">
+        <summary>AI</summary>
         <label for="ai-profile">AI Model</label>
         <select id="ai-profile"></select>
         <div id="ai-current" class="hint">AI loading...</div>
@@ -276,14 +315,8 @@
           <button id="ai-test" class="secondary">Test AI</button>
         </div>
         <div id="ai-result" class="result" style="display:none;"></div>
-      </div>
+      </details>
 
-      <div class="row">
-        <button id="send">Send</button>
-        <button id="voice" class="secondary">Voice Input</button>
-        <button id="clear" class="warn">Clear</button>
-        <button id="clear-image" class="secondary">Clear Image</button>
-      </div>
       <div class="hint">
         音声入力はChrome/Edge系ブラウザで動作します。HTTP環境ではブラウザ設定によりマイク許可が制限される場合があります。
       </div>
@@ -325,6 +358,9 @@
     const voiceButton = document.getElementById('voice');
     const autoTopic = document.getElementById('auto-topic');
     const autoTopicMinutes = document.getElementById('auto-topic-minutes');
+    const targetReadyCount = document.getElementById('target-ready-count');
+    const autoQueueStatus = document.getElementById('auto-queue-status');
+    const autoQueueList = document.getElementById('auto-queue-list');
     const posePreset = document.getElementById('pose-preset');
     const plantImageSourceInputs = Array.from(document.querySelectorAll('input[name="plant-image-source"]'));
     const plantImageFile = document.getElementById('plant-image-file');
@@ -336,8 +372,6 @@
     let recognition = null;
     let listening = false;
     let latestState = null;
-    let lastAutoTopicAt = 0;
-    let autoTopicSending = false;
     let selectedPlantImageDataUrl = null;
     let aiProfiles = [];
     let activeAiProfileId = null;
@@ -568,46 +602,76 @@
       reader.readAsDataURL(file);
     }
 
-    async function maybeSendAutoTopic() {
-      if (!autoTopic.checked || autoTopicSending) return;
-      const intervalMs = Number(autoTopicMinutes.value || 3) * 60 * 1000;
-      const now = Date.now();
-      if (now - lastAutoTopicAt < intervalMs) return;
-      if (latestState && latestState.status === 'thinking') return;
-      autoTopicSending = true;
-      lastAutoTopicAt = now;
-      localStorage.setItem('guardianLiveAutoTopicAt', String(lastAutoTopicAt));
-      try {
-        await sendText(
-          '今の植物の様子を見て、守護天使から自然に短く話題を振ってください。',
-          'admin-live-auto'
-        );
-        setLog('auto topic sent');
-      } catch (e) {
-        setLog('auto topic error: ' + String(e));
-      } finally {
-        autoTopicSending = false;
+    function renderAutoQueue(data) {
+      autoTopic.checked = Boolean(data.enabled);
+      autoTopicMinutes.value = String(Math.max(1, Math.round(Number(data.talkIntervalSeconds || 180) / 60)));
+      targetReadyCount.value = String(data.targetReadyCount || 3);
+      const next = data.enabled ? Number(data.nextPlayInSeconds || 0) + 's' : '-';
+      autoQueueStatus.textContent =
+        'enabled=' + data.enabled +
+        ' | ready=' + data.readyCount + '/' + data.targetReadyCount +
+        ' | generating=' + data.generatingCount +
+        ' | errors=' + data.errorCount +
+        ' | next=' + next;
+
+      const queue = data.queue || [];
+      if (!queue.length) {
+        autoQueueList.innerHTML = '<span class="muted">Queue is empty.</span>';
+        return;
       }
+      autoQueueList.innerHTML = queue.slice(-6).reverse().map(item => {
+        const preview = item.assistantText || item.error || '';
+        return '<div><strong>' + esc(item.status) + '</strong> ' +
+          '<span class="muted">' + esc((item.id || '').slice(0, 8)) + '</span><br>' +
+          esc(preview.length > 120 ? preview.slice(0, 120) + '...' : preview) +
+          '</div>';
+      }).join('<hr>');
+    }
+
+    async function loadAutoStatus() {
+      const res = await fetch('/api/live/auto', { cache: 'no-store' });
+      const data = await res.json();
+      renderAutoQueue(data);
+      return data;
+    }
+
+    async function saveAutoSettings() {
+      const res = await fetch('/api/live/auto/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          talkIntervalSeconds: Number(autoTopicMinutes.value || 3) * 60,
+          targetReadyCount: Number(targetReadyCount.value || 3)
+        })
+      });
+      const data = await res.json();
+      renderAutoQueue(data);
+      return data;
+    }
+
+    async function postAutoAction(path) {
+      const res = await fetch('/api/live/auto/' + path, { method: 'POST' });
+      const data = await res.json();
+      renderAutoQueue(data);
+      return data;
     }
 
     function setupAutoTopic() {
-      autoTopic.checked = localStorage.getItem('guardianLiveAutoTopic') === 'true';
-      autoTopicMinutes.value = localStorage.getItem('guardianLiveAutoTopicMinutes') || autoTopicMinutes.value;
-      lastAutoTopicAt = Number(localStorage.getItem('guardianLiveAutoTopicAt') || '0');
-      autoTopic.addEventListener('change', () => {
-        localStorage.setItem('guardianLiveAutoTopic', String(autoTopic.checked));
-        if (autoTopic.checked) {
-          lastAutoTopicAt = Date.now();
-          localStorage.setItem('guardianLiveAutoTopicAt', String(lastAutoTopicAt));
-          setLog('auto topic enabled');
-        } else {
-          setLog('auto topic disabled');
-        }
+      autoTopic.addEventListener('change', async () => {
+        const desiredEnabled = autoTopic.checked;
+        await saveAutoSettings();
+        await postAutoAction(desiredEnabled ? 'start' : 'stop');
+        setLog(desiredEnabled ? 'auto mode enabled' : 'auto mode disabled');
       });
-      autoTopicMinutes.addEventListener('change', () => {
-        localStorage.setItem('guardianLiveAutoTopicMinutes', autoTopicMinutes.value);
+      autoTopicMinutes.addEventListener('change', () => saveAutoSettings().catch(e => setLog(String(e))));
+      targetReadyCount.addEventListener('change', () => saveAutoSettings().catch(e => setLog(String(e))));
+      document.getElementById('auto-refill').addEventListener('click', () => postAutoAction('refill').catch(e => setLog(String(e))));
+      document.getElementById('auto-skip').addEventListener('click', () => postAutoAction('skip').catch(e => setLog(String(e))));
+      document.getElementById('auto-clear').addEventListener('click', () => postAutoAction('clear').catch(e => setLog(String(e))));
+      loadAutoStatus().catch(e => {
+        autoQueueStatus.textContent = 'auto status error: ' + e.message;
       });
-      setInterval(() => maybeSendAutoTopic(), 15000);
+      setInterval(() => loadAutoStatus().catch(() => {}), 5000);
     }
 
     function setupVoiceInput() {

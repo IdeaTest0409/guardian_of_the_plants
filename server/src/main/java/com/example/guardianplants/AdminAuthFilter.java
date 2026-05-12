@@ -55,6 +55,7 @@ public class AdminAuthFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         if (path.startsWith("/admin/")) return true;
         if (path.startsWith("/api/ai/")) return true;
+        if (path.startsWith("/api/live/auto")) return true;
         if ("DELETE".equalsIgnoreCase(request.getMethod()) && "/api/logs".equals(path)) return true;
         return "POST".equalsIgnoreCase(request.getMethod()) && PROTECTED_LIVE_POST_PATHS.contains(path);
     }

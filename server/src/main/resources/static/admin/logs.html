@@ -31,6 +31,8 @@
         .delete-btn:disabled { background: #aaa; cursor: wait; }
         .auto-refresh { font-size: 0.75rem; color: #888; margin-left: 8px; }
         .hours-select { font-size: 0.8rem; padding: 4px 6px; border: 1px solid #ccc; border-radius: 4px; background: #fff; }
+        .filter-bar { display: flex; justify-content: center; gap: 14px; align-items: center; flex-wrap: wrap; margin: -6px 0 14px; font-size: 0.85rem; }
+        .filter-bar label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th { background: #f0f0f0; padding: 8px; text-align: left; border-bottom: 2px solid #ddd; white-space: nowrap; }
         td { padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
@@ -80,6 +82,10 @@
 
     <div class="status-bar" id="status-bar">
         <div class="status-item status-info">Loading...</div>
+    </div>
+    <div class="filter-bar">
+        <label><input id="live-only" type="checkbox" onchange="loadAll()"> Live only</label>
+        <span>Shows live flows, live chat, TTS, and LiveStage3D/browser stage logs.</span>
     </div>
 
     <div class="section">
@@ -190,6 +196,30 @@
             return s != null ? String(s) : '';
         }
 
+        function liveOnlyEnabled() {
+            return Boolean(document.getElementById('live-only')?.checked);
+        }
+
+        function isLiveFlow(row) {
+            const type = safeStr(row.request_type).toLowerCase();
+            const detail = safeStr(row.latest_detail).toLowerCase();
+            return type === 'live' || type === 'tts' || detail.includes('live') || detail.includes('admin-live');
+        }
+
+        function isLiveChat(row) {
+            const device = safeStr(row.device_id).toLowerCase();
+            const conversation = safeStr(row.conversation_id).toLowerCase();
+            const status = safeStr(row.status).toLowerCase();
+            return device.includes('admin-live') || conversation.includes('admin-live') || status.includes('server-live');
+        }
+
+        function isLiveAppLog(row) {
+            const device = safeStr(row.device_id).toLowerCase();
+            const category = safeStr(row.category).toLowerCase();
+            const message = safeStr(row.message_preview).toLowerCase();
+            return category.includes('livestage') || category.includes('live') || device.includes('browser-live') || device.includes('admin-live') || message.includes('live');
+        }
+
         function fmtVersionTime(ts) {
             if (!ts || ts === 'unknown') return 'unknown';
             const date = new Date(ts);
@@ -267,6 +297,7 @@
             fetch('/api/logs/flow?limit=50&hours=' + hours)
                 .then(r => r.json())
                 .then(data => {
+                    if (liveOnlyEnabled()) data = data.filter(isLiveFlow);
                     document.getElementById('flow-count').textContent = '(' + data.length + '件)';
                     const container = document.getElementById('flow-container');
                     if (data.length === 0) {
@@ -353,6 +384,7 @@
             fetch('/api/logs/chat?limit=100&hours=' + hours)
                 .then(r => r.json())
                 .then(data => {
+                    if (liveOnlyEnabled()) data = data.filter(isLiveChat);
                     document.getElementById('chat-count').textContent = '(' + data.length + '件)';
                     const tbody = document.getElementById('chat-tbody');
                     if (data.length === 0) {
@@ -385,6 +417,7 @@
             fetch('/api/logs/app?limit=100&hours=' + hours)
                 .then(r => r.json())
                 .then(data => {
+                    if (liveOnlyEnabled()) data = data.filter(isLiveAppLog);
                     document.getElementById('app-count').textContent = '(' + data.length + '件)';
                     const tbody = document.getElementById('app-tbody');
                     if (data.length === 0) {
