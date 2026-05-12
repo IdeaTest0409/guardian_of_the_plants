@@ -371,7 +371,7 @@ public class LiveStateService {
     private String normalizeBgmTrack(String value) {
         if (value == null || value.isBlank()) return DEFAULT_BGM_TRACK;
         return switch (value.trim()) {
-            case "peaceful_ambient", "none" -> value.trim();
+            case "peaceful_ambient", "jazz_1", "jazz_2", "jazz_3", "none" -> value.trim();
             default -> DEFAULT_BGM_TRACK;
         };
     }
@@ -459,6 +459,27 @@ public class LiveStateService {
                     "url", "/live/assets/audio/peaceful-ambient-music.mp3",
                     "license", "CC BY 4.0",
                     "source", "Orange Free Sounds / Alexander Blu"
+                ),
+                Map.of(
+                    "id", "jazz_1",
+                    "label", "Jazz Guitar 1",
+                    "url", "/live/assets/audio/1-jazz.mp3",
+                    "license", "CC0 1.0",
+                    "source", "HoliznaCC0 / Free Music Archive"
+                ),
+                Map.of(
+                    "id", "jazz_2",
+                    "label", "Jazz Guitar 2",
+                    "url", "/live/assets/audio/2-jazz.mp3",
+                    "license", "CC0 1.0",
+                    "source", "HoliznaCC0 / Free Music Archive"
+                ),
+                Map.of(
+                    "id", "jazz_3",
+                    "label", "Jazz Guitar 3",
+                    "url", "/live/assets/audio/3-jazz.mp3",
+                    "license", "CC0 1.0",
+                    "source", "HoliznaCC0 / Free Music Archive"
                 )
             ));
             return map;
