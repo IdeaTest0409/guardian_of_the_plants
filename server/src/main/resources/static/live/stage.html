@@ -234,6 +234,8 @@
     let speechRetryTimer = null;
     let lastSpeechErrorAt = 0;
     let speechRetryAttempt = 0;
+    let audioUnlocked = hasAudioActivation();
+    let autoplayBlockedLogged = false;
     const MAX_SPEECH_RETRIES = 3;
     let stageVolume = readStoredStageVolume();
     let audioEnabled = stageVolume > 0;
@@ -273,10 +275,15 @@
     audioVolume.value = String(Math.round(stageVolume * 100));
     updateAudioVolumeLabel();
     audioVolume.addEventListener('input', () => {
+      unlockAudioFromUserGesture();
       setStageVolume(Number(audioVolume.value || 0) / 100, true);
     });
     audioVolume.addEventListener('change', () => {
+      unlockAudioFromUserGesture();
       setStageVolume(Number(audioVolume.value || 0) / 100, true);
+    });
+    ['pointerdown', 'keydown', 'touchstart'].forEach(eventName => {
+      window.addEventListener(eventName, unlockAudioFromUserGesture, { passive: true });
     });
 
     function readStoredStageVolume() {
@@ -321,14 +328,31 @@
         pendingAudioUrl = url;
         return;
       }
+      if (!canStartSpeechAudio()) {
+        pendingAudioUrl = url;
+        if (!autoplayBlockedLogged) {
+          autoplayBlockedLogged = true;
+          logClientInfo('Speech audio waiting for user activation', {
+            audioUrl: url,
+            userActivation: userActivationSnapshot()
+          });
+        }
+        renderAutoStatus();
+        return;
+      }
       if (url === lastAudioUrl && !pendingAudioUrl) return;
-      if (url === pendingAudioUrl) return;
+      if (pendingAudioUrl) return;
       attemptSpeechPlayback(url, 0);
     }
 
     function attemptSpeechPlayback(url, attempt) {
       if (!audioEnabled || !url) {
         pendingAudioUrl = url || pendingAudioUrl;
+        return;
+      }
+      if (!canStartSpeechAudio()) {
+        pendingAudioUrl = url;
+        renderAutoStatus();
         return;
       }
       if (speechRetryTimer) {
@@ -358,7 +382,10 @@
         speakingStartedAt = 0;
         lastSpeechErrorAt = Date.now();
         applyBgmDucking(false);
-        const shouldRetry = attempt < MAX_SPEECH_RETRIES && url !== lastAudioUrl;
+        if (e?.name === 'NotAllowedError') {
+          audioUnlocked = false;
+        }
+        const shouldRetry = e?.name !== 'NotAllowedError' && attempt < MAX_SPEECH_RETRIES && url !== lastAudioUrl;
         logClientError('Speech audio play failed', e, {
           audioUrl: url,
           attempt,
@@ -373,6 +400,34 @@
           renderAutoStatus();
         }
       });
+    }
+
+    function hasAudioActivation() {
+      return Boolean(window.navigator?.userActivation?.hasBeenActive);
+    }
+
+    function canStartSpeechAudio() {
+      return audioEnabled && (audioUnlocked || hasAudioActivation());
+    }
+
+    function userActivationSnapshot() {
+      const activation = window.navigator?.userActivation;
+      return activation ? {
+        hasBeenActive: activation.hasBeenActive,
+        isActive: activation.isActive
+      } : { unavailable: true };
+    }
+
+    function unlockAudioFromUserGesture() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      autoplayBlockedLogged = false;
+      if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+      }
+      applyBgmSettings(true);
+      retryPendingSpeech();
+      renderAutoStatus();
     }
 
     audio.addEventListener('ended', () => {
@@ -534,6 +589,10 @@
       }
       if (!latestAutoStatus.enabled) {
         target.textContent = '手動応答モード';
+        return;
+      }
+      if (pendingAudioUrl && !canStartSpeechAudio()) {
+        target.textContent = '音声待機中 | 画面をクリックしてください';
         return;
       }
       if (pendingAudioUrl && lastSpeechErrorAt && Date.now() - lastSpeechErrorAt < 30000) {
