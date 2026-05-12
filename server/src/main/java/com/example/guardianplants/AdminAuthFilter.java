@@ -14,7 +14,7 @@ import java.io.IOException;
 @Component
 public class AdminAuthFilter extends OncePerRequestFilter {
 
-    static final String SESSION_AUTH_KEY = "adminAuthenticated";
+    public static final String SESSION_AUTH_KEY = "adminAuthenticated";
 
     private final String username;
     private final String password;
@@ -49,7 +49,7 @@ public class AdminAuthFilter extends OncePerRequestFilter {
         response.sendRedirect(loginPath);
     }
 
-    boolean checkCredentials(String user, String pass) {
+    public boolean checkCredentials(String user, String pass) {
         if (user == null || pass == null) return false;
         return user.equals(this.username) && pass.equals(this.password);
     }
