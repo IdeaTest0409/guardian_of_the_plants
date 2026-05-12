@@ -186,6 +186,66 @@
       white-space: pre-wrap;
       font-size: 13px;
     }
+    .auto-summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .auto-metric {
+      padding: 10px;
+      border: 1px solid #d7e3de;
+      border-radius: 6px;
+      background: #f6faf8;
+    }
+    .auto-metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 20px;
+      color: #1f4f39;
+    }
+    .auto-metric span {
+      color: #66746f;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .queue-item {
+      padding: 10px 0;
+      border-top: 1px solid #d7dfdc;
+    }
+    .queue-item:first-child { border-top: 0; padding-top: 0; }
+    .queue-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+    .queue-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #e6f6ee;
+      color: #14633b;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .queue-badge.pending { background: #fff7df; color: #76530c; }
+    .queue-badge.error { background: #fde8e8; color: #991b1b; }
+    .queue-badge.used { background: #e8edf0; color: #4b5960; }
+    .queue-meta {
+      color: #66746f;
+      font-size: 12px;
+    }
+    .queue-lines {
+      display: grid;
+      gap: 4px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .queue-lines b { color: #2b3f37; }
     .hint {
       color: #66746f;
       font-size: 13px;
@@ -212,6 +272,7 @@
     @media (max-width: 920px) {
       main { grid-template-columns: 1fr; }
       .quick-grid { grid-template-columns: 1fr; }
+      .auto-summary { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -280,6 +341,7 @@
         <div class="hint">
           Auto mode is handled by the server. It keeps several AI replies and audio files ready, then plays them in sequence.
         </div>
+        <div id="auto-summary" class="auto-summary"></div>
         <div id="auto-queue-status" class="log"></div>
         <div id="auto-queue-list" class="result"></div>
       </details>
@@ -375,6 +437,8 @@
     let selectedPlantImageDataUrl = null;
     let aiProfiles = [];
     let activeAiProfileId = null;
+    let latestAutoStatus = null;
+    let latestAutoStatusReceivedAt = 0;
 
     function setLog(text) {
       log.textContent = text || '';
@@ -602,30 +666,100 @@
       reader.readAsDataURL(file);
     }
 
+    function formatCountdown(seconds) {
+      const value = Math.max(0, Math.ceil(Number(seconds || 0)));
+      const minutes = Math.floor(value / 60);
+      const rest = value % 60;
+      if (minutes <= 0) return rest + '秒';
+      return minutes + '分' + String(rest).padStart(2, '0') + '秒';
+    }
+
+    function itemStage(item) {
+      const status = item.status || 'queued';
+      const hasText = Boolean(item.assistantText);
+      const hasAudio = Boolean(item.audioUrl);
+      if (status === 'generating_text' || status === 'queued') {
+        return { label: '文章生成中', tone: 'pending', text: hasText ? '完了' : '生成中', audio: '未開始' };
+      }
+      if (status === 'generating_audio') {
+        return { label: '文章完了 / 音声生成中', tone: 'pending', text: '完了', audio: '生成中' };
+      }
+      if (status === 'ready' && hasAudio) {
+        return { label: '音声付きで準備完了', tone: 'ready', text: '完了', audio: '完了' };
+      }
+      if (status === 'ready') {
+        return { label: '音声なしで準備完了', tone: 'pending', text: '完了', audio: item.audioStatus === 'error' ? 'エラー' : 'なし' };
+      }
+      if (status === 'used') {
+        return { label: hasAudio ? '再生済み（音声あり）' : '再生済み（音声なし）', tone: 'used', text: '完了', audio: hasAudio ? '完了' : 'なし' };
+      }
+      if (status === 'error') {
+        return { label: 'エラー', tone: 'error', text: hasText ? '完了' : '失敗', audio: '停止' };
+      }
+      return { label: status, tone: 'pending', text: hasText ? '完了' : '未完了', audio: hasAudio ? '完了' : '未完了' };
+    }
+
+    function renderAutoSummary(data, countdownSeconds) {
+      const queue = data.queue || [];
+      const audioReadyCount = queue.filter(item => item.status === 'ready' && item.audioUrl).length;
+      const readyText = audioReadyCount + ' / ' + (data.targetReadyCount || 0);
+      let nextText = '自動再生停止中';
+      if (data.enabled) {
+        nextText = Number(data.readyCount || 0) > 0
+          ? formatCountdown(countdownSeconds)
+          : 'ストック待ち';
+      }
+      document.getElementById('auto-summary').innerHTML =
+        '<div class="auto-metric"><span>次の再生</span><strong>' + esc(nextText) + '</strong></div>' +
+        '<div class="auto-metric"><span>音声付きストック</span><strong>' + esc(readyText) + '</strong></div>' +
+        '<div class="auto-metric"><span>文章/音声生成中</span><strong>' + esc(data.generatingCount || 0) + '</strong></div>' +
+        '<div class="auto-metric"><span>エラー</span><strong>' + esc(data.errorCount || 0) + '</strong></div>';
+    }
+
+    function renderAutoCountdown() {
+      if (!latestAutoStatus) return;
+      const elapsed = (Date.now() - latestAutoStatusReceivedAt) / 1000;
+      const countdown = Math.max(0, Number(latestAutoStatus.nextPlayInSeconds || 0) - elapsed);
+      renderAutoSummary(latestAutoStatus, countdown);
+      const next = latestAutoStatus.enabled ? formatCountdown(countdown) : '-';
+      autoQueueStatus.textContent =
+        'enabled=' + latestAutoStatus.enabled +
+        ' | ready=' + latestAutoStatus.readyCount + '/' + latestAutoStatus.targetReadyCount +
+        ' | generating=' + latestAutoStatus.generatingCount +
+        ' | errors=' + latestAutoStatus.errorCount +
+        ' | next=' + next;
+    }
+
     function renderAutoQueue(data) {
+      latestAutoStatus = data;
+      latestAutoStatusReceivedAt = Date.now();
       autoTopic.checked = Boolean(data.enabled);
       autoTopicMinutes.value = String(Math.max(1, Math.round(Number(data.talkIntervalSeconds || 180) / 60)));
       targetReadyCount.value = String(data.targetReadyCount || 3);
-      const next = data.enabled ? Number(data.nextPlayInSeconds || 0) + 's' : '-';
-      autoQueueStatus.textContent =
-        'enabled=' + data.enabled +
-        ' | ready=' + data.readyCount + '/' + data.targetReadyCount +
-        ' | generating=' + data.generatingCount +
-        ' | errors=' + data.errorCount +
-        ' | next=' + next;
+      renderAutoCountdown();
 
       const queue = data.queue || [];
       if (!queue.length) {
-        autoQueueList.innerHTML = '<span class="muted">Queue is empty.</span>';
+        autoQueueList.innerHTML = '<span class="queue-meta">Queue is empty.</span>';
         return;
       }
       autoQueueList.innerHTML = queue.slice(-6).reverse().map(item => {
+        const stage = itemStage(item);
         const preview = item.assistantText || item.error || '';
-        return '<div><strong>' + esc(item.status) + '</strong> ' +
-          '<span class="muted">' + esc((item.id || '').slice(0, 8)) + '</span><br>' +
-          esc(preview.length > 120 ? preview.slice(0, 120) + '...' : preview) +
+        const created = item.readyAt || item.textReadyAt || item.createdAt || '';
+        return '<div class="queue-item">' +
+          '<div class="queue-head">' +
+            '<span class="queue-badge ' + esc(stage.tone) + '">' + esc(stage.label) + '</span>' +
+            '<span class="queue-meta">' + esc((item.id || '').slice(0, 8)) + '</span>' +
+            '<span class="queue-meta">' + esc(created) + '</span>' +
+          '</div>' +
+          '<div class="queue-lines">' +
+            '<div><b>文章:</b> ' + esc(stage.text) + '</div>' +
+            '<div><b>音声:</b> ' + esc(stage.audio) + (item.audioUrl ? ' <span class="queue-meta">' + esc(item.audioUrl) + '</span>' : '') + '</div>' +
+            '<div><b>内容:</b> ' + esc(preview.length > 140 ? preview.slice(0, 140) + '...' : preview || '-') + '</div>' +
+          '</div>' +
           '</div>';
-      }).join('<hr>');
+      }).join('');
     }
 
     async function loadAutoStatus() {
@@ -672,6 +806,7 @@
         autoQueueStatus.textContent = 'auto status error: ' + e.message;
       });
       setInterval(() => loadAutoStatus().catch(() => {}), 5000);
+      setInterval(renderAutoCountdown, 1000);
     }
 
     function setupVoiceInput() {

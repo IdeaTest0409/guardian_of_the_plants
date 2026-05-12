@@ -43,6 +43,7 @@ public class AutoTalkService {
     private int targetReadyCount = 3;
     private int talkIntervalSeconds = 180;
     private Instant nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
+    private static final int START_PLAY_DELAY_SECONDS = 5;
 
     public AutoTalkService(ChatService chatService,
                            TtsService ttsService,
@@ -84,9 +85,7 @@ public class AutoTalkService {
 
     public synchronized Map<String, Object> start() {
         enabled = true;
-        if (nextPlayAt.isBefore(Instant.now())) {
-            nextPlayAt = Instant.now().plusSeconds(Math.min(15, talkIntervalSeconds));
-        }
+        scheduleSoonIfReady();
         requestRefill();
         return snapshot();
     }
@@ -154,15 +153,19 @@ public class AutoTalkService {
             String assistantText = chatService.complete(request, traceId);
             synchronized (this) {
                 item.assistantText(assistantText);
+                item.textReadyAt(now());
                 item.status("generating_audio");
             }
 
             String audioUrl = synthesizeAudio(assistantText);
             synchronized (this) {
                 item.audioUrl(audioUrl);
+                item.audioReadyAt(now());
+                item.audioStatus(audioUrl == null ? "skipped" : "ready");
                 item.status("ready");
                 item.readyAt(now());
                 generating = false;
+                scheduleSoonIfReady();
                 requestRefill();
             }
         } catch (Exception e) {
@@ -170,6 +173,7 @@ public class AutoTalkService {
             synchronized (this) {
                 item.status("error");
                 item.error(e.getMessage());
+                item.audioStatus("error");
                 generating = false;
             }
         }
@@ -275,6 +279,14 @@ public class AutoTalkService {
         return queue.stream().filter(item -> item.id().equals(id)).findFirst().orElse(null);
     }
 
+    private void scheduleSoonIfReady() {
+        if (!enabled || readyCount() <= 0) return;
+        Instant soon = Instant.now().plusSeconds(START_PLAY_DELAY_SECONDS);
+        if (nextPlayAt.isAfter(soon)) {
+            nextPlayAt = soon;
+        }
+    }
+
     private Map<String, Object> snapshot() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("enabled", enabled);
@@ -317,6 +329,9 @@ public class AutoTalkService {
         private String audioUrl;
         private String error;
         private final String createdAt;
+        private String textReadyAt;
+        private String audioReadyAt;
+        private String audioStatus;
         private String readyAt;
         private String usedAt;
 
@@ -338,6 +353,9 @@ public class AutoTalkService {
         String audioUrl() { return audioUrl; }
         void audioUrl(String audioUrl) { this.audioUrl = audioUrl; }
         void error(String error) { this.error = error; }
+        void textReadyAt(String textReadyAt) { this.textReadyAt = textReadyAt; }
+        void audioReadyAt(String audioReadyAt) { this.audioReadyAt = audioReadyAt; }
+        void audioStatus(String audioStatus) { this.audioStatus = audioStatus; }
         void readyAt(String readyAt) { this.readyAt = readyAt; }
         void usedAt(String usedAt) { this.usedAt = usedAt; }
 
@@ -349,6 +367,9 @@ public class AutoTalkService {
             map.put("audioUrl", audioUrl);
             map.put("error", error);
             map.put("createdAt", createdAt);
+            map.put("textReadyAt", textReadyAt);
+            map.put("audioReadyAt", audioReadyAt);
+            map.put("audioStatus", audioStatus);
             map.put("readyAt", readyAt);
             map.put("usedAt", usedAt);
             return map;
