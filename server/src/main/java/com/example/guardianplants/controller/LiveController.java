@@ -185,6 +185,7 @@ public class LiveController {
     public ResponseEntity<?> audio(@PathVariable String id) {
         var audio = liveAudioService.get(id);
         if (audio == null) {
+            log.warn("Live audio not found id={}", id);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "audio not found"));
         }
         return ResponseEntity.ok()

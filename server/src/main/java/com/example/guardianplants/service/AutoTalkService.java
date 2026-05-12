@@ -159,6 +159,7 @@ public class AutoTalkService {
         if (audioUrl == null || audioUrl.equals(currentAudioUrl)) {
             lastAudioEndedAt = Instant.now();
             nextPlayAt = nextScheduledPlayAt(nextPlayAt);
+            log.info("Auto talk audio ended audioUrl={} nextPlayAt={}", audioUrl, nextPlayAt);
         }
         return snapshot();
     }
@@ -341,6 +342,7 @@ public class AutoTalkService {
             lastAudioEndedAt = lastPlayedAt;
         }
         nextPlayAt = nextScheduledPlayAt(lastPlayedAt.plusSeconds(talkIntervalSeconds));
+        log.info("Auto talk played item={} manualSkip={} audioUrl={} nextPlayAt={}", item.id(), manualSkip, currentAudioUrl, nextPlayAt);
         requestRefill();
     }
 

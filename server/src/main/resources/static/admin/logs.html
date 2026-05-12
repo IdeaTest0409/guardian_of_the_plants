@@ -26,6 +26,8 @@
         .download-btn { background: #16a34a; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         .download-btn:hover { background: #15803d; }
         .download-btn:disabled { background: #aaa; cursor: wait; }
+        .primary-download { display: flex; justify-content: center; margin: 0 0 14px; }
+        .primary-download .download-btn { font-size: 1rem; font-weight: 700; padding: 10px 22px; border-radius: 6px; }
         .delete-btn { background: #dc2626; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
         .delete-btn:hover { background: #b91c1c; }
         .delete-btn:disabled { background: #aaa; cursor: wait; }
@@ -76,6 +78,9 @@
 <body>
     <h1>Guardian Plants - Log Viewer</h1>
     <div class="version-bar" id="version-bar">Version: loading...</div>
+    <div class="primary-download">
+        <button class="download-btn" id="download-all-logs-btn" onclick="downloadAllLogs()">全てのログをダウンロード</button>
+    </div>
     <div class="status-bar">
         <button class="delete-btn" id="delete-all-logs-btn" onclick="deleteAllLogs()">ログを全て削除する</button>
     </div>
@@ -474,6 +479,39 @@
                     alert('Download failed: ' + e.message);
                 })
                 .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Download'; } });
+        }
+
+        function downloadAllLogs() {
+            const btn = document.getElementById('download-all-logs-btn');
+            if (btn) { btn.disabled = true; btn.textContent = 'ダウンロード中...'; }
+            fetch('/api/logs/download?hours=24&type=all')
+                .then(async r => {
+                    const text = await r.text();
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + ': ' + text.substring(0, 300));
+                    }
+                    return text;
+                })
+                .then(text => {
+                    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'guardian-logs.txt';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(e => {
+                    alert('Download failed: ' + e.message);
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = '全てのログをダウンロード';
+                    }
+                });
         }
 
         function deleteAllLogs() {

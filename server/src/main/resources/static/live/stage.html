@@ -229,7 +229,12 @@
   <script type="module">
     let lastUpdatedAt = null;
     let lastAudioUrl = null;
+    let pendingAudioUrl = null;
     let speakingStartedAt = 0;
+    let speechRetryTimer = null;
+    let lastSpeechErrorAt = 0;
+    let speechRetryAttempt = 0;
+    const MAX_SPEECH_RETRIES = 3;
     let stageVolume = readStoredStageVolume();
     let audioEnabled = stageVolume > 0;
     let currentStatus = 'idle';
@@ -295,6 +300,9 @@
       setupAudioAnalysis();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       applyBgmSettings(shouldStartAudio);
+      if (shouldStartAudio) {
+        retryPendingSpeech();
+      }
     }
 
     function updateAudioVolumeLabel() {
@@ -308,22 +316,86 @@
     }
 
     function playAudio(url) {
-      if (!audioEnabled || !url || url === lastAudioUrl) return;
-      lastAudioUrl = url;
+      if (!url) return;
+      if (!audioEnabled) {
+        pendingAudioUrl = url;
+        return;
+      }
+      if (url === lastAudioUrl && !pendingAudioUrl) return;
+      if (url === pendingAudioUrl) return;
+      attemptSpeechPlayback(url, 0);
+    }
+
+    function attemptSpeechPlayback(url, attempt) {
+      if (!audioEnabled || !url) {
+        pendingAudioUrl = url || pendingAudioUrl;
+        return;
+      }
+      if (speechRetryTimer) {
+        clearTimeout(speechRetryTimer);
+        speechRetryTimer = null;
+      }
+      pendingAudioUrl = url;
+      speechRetryAttempt = attempt;
       audio.src = url + '?t=' + Date.now();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       audio.volume = stageVolume;
       speakingStartedAt = Date.now();
       applyBgmDucking(true);
       setupAudioAnalysis();
-      audio.play().catch(() => {
+      logClientInfo('Speech audio play attempt', { audioUrl: url, attempt });
+      audio.play().then(() => {
+        lastAudioUrl = url;
+        pendingAudioUrl = null;
+        lastSpeechErrorAt = 0;
+        logClientInfo('Speech audio play started', {
+          audioUrl: url,
+          attempt,
+          duration: Number.isFinite(audio.duration) ? audio.duration : null
+        });
+        renderAutoStatus();
+      }).catch((e) => {
         speakingStartedAt = 0;
+        lastSpeechErrorAt = Date.now();
+        applyBgmDucking(false);
+        const shouldRetry = attempt < MAX_SPEECH_RETRIES && url !== lastAudioUrl;
+        logClientError('Speech audio play failed', e, {
+          audioUrl: url,
+          attempt,
+          willRetry: shouldRetry,
+          volume: stageVolume,
+          readyState: audio.readyState,
+          networkState: audio.networkState
+        });
+        if (shouldRetry) {
+          speechRetryTimer = setTimeout(() => attemptSpeechPlayback(url, attempt + 1), 1200);
+        } else {
+          renderAutoStatus();
+        }
       });
     }
 
     audio.addEventListener('ended', () => {
       speakingStartedAt = 0;
       applyBgmDucking(false);
+      logClientInfo('Speech audio ended', {
+        audioUrl: lastAudioUrl,
+        currentTime: audio.currentTime,
+        duration: Number.isFinite(audio.duration) ? audio.duration : null
+      });
+      renderAutoStatus();
+    });
+    audio.addEventListener('error', () => {
+      speakingStartedAt = 0;
+      lastSpeechErrorAt = Date.now();
+      applyBgmDucking(false);
+      logClientError('Speech audio element error', new Error('audio element error'), {
+        audioUrl: pendingAudioUrl || lastAudioUrl,
+        mediaErrorCode: audio.error ? audio.error.code : null,
+        mediaErrorMessage: audio.error ? audio.error.message : '',
+        readyState: audio.readyState,
+        networkState: audio.networkState
+      });
       renderAutoStatus();
     });
     audio.addEventListener('pause', () => {
@@ -340,6 +412,11 @@
         return Date.now() - speakingStartedAt < 120000;
       }
       return audio.currentTime < audio.duration - 0.05;
+    }
+
+    function retryPendingSpeech() {
+      if (!pendingAudioUrl || pendingAudioUrl === lastAudioUrl) return;
+      attemptSpeechPlayback(pendingAudioUrl, 0);
     }
 
     function render(state) {
@@ -423,7 +500,7 @@
       if (!bgmAudio.src || !bgmAudio.src.includes(url)) {
         bgmAudio.src = url;
       }
-      applyBgmDucking(!audio.paused && !audio.ended);
+      applyBgmDucking(isSpeechPlaying());
       if (audioEnabled && shouldPlay !== false) {
         bgmAudio.play().catch(() => {});
       }
@@ -457,6 +534,10 @@
       }
       if (!latestAutoStatus.enabled) {
         target.textContent = '手動応答モード';
+        return;
+      }
+      if (pendingAudioUrl && lastSpeechErrorAt && Date.now() - lastSpeechErrorAt < 30000) {
+        target.textContent = '音声再生を再試行中 | ' + Math.min(speechRetryAttempt + 1, MAX_SPEECH_RETRIES) + '/' + MAX_SPEECH_RETRIES;
         return;
       }
       if (Number(latestAutoStatus.readyCount || 0) > 0) {
@@ -566,22 +647,28 @@
     }
 
     function inspectModel(gltf, model) {
-      const boneNames = [];
+      let boneCount = 0;
+      const boneSamples = [];
       const morphNames = [];
       model.traverse((node) => {
-        if (node.isBone && boneNames.length < 80) boneNames.push(node.name);
+        if (node.isBone) {
+          boneCount++;
+          if (boneSamples.length < 12) boneSamples.push(node.name);
+        }
         if (node.morphTargetDictionary) {
           Object.keys(node.morphTargetDictionary).forEach((name) => {
-            if (morphNames.length < 80 && !morphNames.includes(name)) morphNames.push(name);
+            if (morphNames.length < 20 && !morphNames.includes(name)) morphNames.push(name);
           });
         }
       });
       if (!modelInfoLogged) {
         modelInfoLogged = true;
         logClientInfo('angel_egna.glb inspected', {
-          animations: gltf.animations.map((clip) => clip.name),
-          boneNames,
-          morphNames,
+          animationCount: gltf.animations.length,
+          animationSamples: gltf.animations.slice(0, 8).map((clip) => clip.name),
+          boneCount,
+          boneSamples,
+          morphSamples: morphNames,
           mouthTargetCount: mouthTargets.length
         });
       }
@@ -851,7 +938,7 @@
           const delta = clock ? clock.getDelta() : 0.016;
           const t = time * 0.001;
           const thinking = currentStatus === 'thinking';
-          const speaking = !audio.paused && !audio.ended;
+          const speaking = isSpeechPlaying();
           const error = currentStatus === 'error' || currentStatus === 'offline';
           updateWalkTarget(t);
           const config = poseConfig();
