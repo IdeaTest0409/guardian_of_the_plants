@@ -672,3 +672,33 @@ server/src/main/java/com/example/guardianplants/controller/LiveController.java
 server/src/main/java/com/example/guardianplants/AdminAuthFilter.java
 server/src/main/resources/static/admin/live.html
 ```
+
+## 2026-05-12
+
+### Admin Dashboard, Session Login, and Auth Restructure
+
+Added an admin dashboard top page and replaced Basic Auth popup with a
+session-based login form. Admin protection is now scoped to `/admin/*` only.
+
+Behavior:
+
+```text
+GET /admin/ redirects to /admin/index.html (dashboard).
+Dashboard shows three cards: Log Viewer, AI Settings, Live Control.
+All APIs outside /admin/ are now public (no auth required).
+Session-based login at /admin/login.html when ADMIN_AUTH_PASSWORD is set.
+Logout link at /admin/logout invalidates the session.
+/login.html is whitelisted from auth check in AdminAuthFilter.
+```
+
+Changed:
+
+```text
+server/src/main/java/com/example/guardianplants/AdminAuthFilter.java
+server/src/main/java/com/example/guardianplants/controller/AdminDashboardController.java (new)
+server/src/main/java/com/example/guardianplants/controller/AdminLoginController.java (new)
+server/src/main/resources/static/admin/index.html (new)
+server/src/main/resources/static/admin/login.html (new)
+docs/development-status.md
+docs/live-aituber-roadmap.md
+```

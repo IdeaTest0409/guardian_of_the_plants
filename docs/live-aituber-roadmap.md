@@ -307,18 +307,11 @@ Recommended priority order:
    Note: local `gemma4:e2b` is useful for low-cost text, but image diagnosis
    may need a vision-capable model.
 
-4. Complete admin security.
+4. Admin security.
 
-   Basic Auth is available for admin pages and admin write APIs when
-   `ADMIN_AUTH_PASSWORD` is set in `.env`:
-
-   ```text
-   /admin/logs.html
-   /admin/ai.html
-   /admin/live.html
-   /api/ai/*
-   selected /api/live write APIs
-   ```
+   Session-based login is available for `/admin/*` pages when `ADMIN_AUTH_PASSWORD`
+   is set in `.env`. Login is at `/admin/login.html`. All APIs outside `/admin/`
+   (including `/api/ai/*`, `/api/live/auto*`, and `/api/logs`) are public.
 
    Remaining recommended controls are HTTPS, rate limits, and confirmation for
    destructive actions.

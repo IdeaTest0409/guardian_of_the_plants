@@ -86,7 +86,7 @@ GET /api/logs/flow/{traceId}
 the selected time window. The timestamp filter uses `OffsetDateTime` so
 PostgreSQL `TIMESTAMPTZ` comparisons work correctly.
 
-The page has no authentication yet and must be protected before public use.
+The page requires session-based authentication. Unauthenticated access redirects to `/admin/login.html`.
 
 ### Milestone 5: Request Flow Tracing
 
@@ -227,7 +227,7 @@ and writes a local warning log.
 | Risk | Status | Mitigation |
 |------|--------|------------|
 | VPS still uses HTTP | Open | Add HTTPS/TLS through nginx |
-| `/admin/logs.html` has no auth | Partially handled | Basic Auth is available when `ADMIN_AUTH_PASSWORD` is set |
+| `/admin/*` has no auth | Implemented | Session-based login at `/admin/login.html` with `ADMIN_AUTH_PASSWORD` in `.env` |
 | Rate limiting is basic | Partially handled | Spring per-IP minute limits added; tune or move to nginx later |
 | TTS CPU load | Expected | Keep `VOICEVOX_ENABLED=false` when not needed |
 | Request trace growth | Partially handled | Retention guard added; consider scheduled cleanup |
@@ -236,13 +236,9 @@ and writes a local warning log.
 | Secrets in `.env` | Manual | Never commit `.env`; keep AI keys server-side |
 | Android `CLOUD` provider | Legacy | Kept for direct LM Studio testing; `SERVER` remains recommended |
 | Live stage can show internal prompt/object text | Mitigated | Live state now extracts display text only and replaces internal auto-talk prompts |
-| Admin AI/log pages have no auth | Partially handled | Set `ADMIN_AUTH_PASSWORD` on VPS; keep HTTPS as separate work |
-
 ## Next Steps
 
-1. Set `ADMIN_AUTH_PASSWORD` on VPS and verify `/admin/*` prompts for Basic Auth.
-2. Add live ON/OFF and server-side auto-talk scheduling.
-3. Tune the `angel_egna.glb` live-stage camera, lighting, animation, and morph handling.
-4. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
-5. Add HTTPS/TLS to nginx on the VPS.
-6. Move RAG/knowledge management server-side.
+1. Tune the `angel_egna.glb` live-stage camera, lighting, animation, and morph handling.
+2. Split AI profiles by purpose: chat, image diagnostic, live talk, summary, and safety.
+3. Add HTTPS/TLS to nginx on the VPS.
+4. Move RAG/knowledge management server-side.
