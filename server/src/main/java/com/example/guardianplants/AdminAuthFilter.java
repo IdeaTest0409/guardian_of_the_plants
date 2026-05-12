@@ -33,6 +33,8 @@ public class AdminAuthFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         if (!path.startsWith("/admin/")) return true;
         if (path.equals("/admin/login.html")) return true;
+        if (path.equals("/admin/login")) return true;
+        if (path.equals("/admin/logout")) return true;
         return false;
     }
 
