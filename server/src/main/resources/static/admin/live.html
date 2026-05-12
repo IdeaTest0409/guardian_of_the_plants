@@ -852,13 +852,21 @@
       const elapsed = (Date.now() - latestAutoStatusReceivedAt) / 1000;
       const countdown = Math.max(0, Number(latestAutoStatus.nextPlayInSeconds || 0) - elapsed);
       renderAutoSummary(latestAutoStatus, countdown);
-      const next = latestAutoStatus.enabled ? formatCountdown(countdown) : '-';
+      let next = latestAutoStatus.enabled ? formatCountdown(countdown) : '-';
+      if (latestAutoStatus.enabled && (latestAutoStatus.waitingReason === 'due' || countdown <= 0)) {
+        next = 'soon';
+      } else if (latestAutoStatus.enabled && latestAutoStatus.waitingReason === 'gap') {
+        next = 'gap';
+      } else if (latestAutoStatus.enabled && latestAutoStatus.waitingReason === 'generating') {
+        next = 'generating';
+      }
       autoQueueStatus.textContent =
         'enabled=' + latestAutoStatus.enabled +
         ' | ready=' + latestAutoStatus.readyCount + '/' + latestAutoStatus.targetReadyCount +
         ' | generating=' + latestAutoStatus.generatingCount +
         ' | errors=' + latestAutoStatus.errorCount +
         ' | gap=' + (latestAutoStatus.minGapSeconds ?? 30) + 's' +
+        ' | reason=' + (latestAutoStatus.waitingReason || '-') +
         ' | next=' + next;
     }
 
@@ -876,13 +884,23 @@
         autoQueueList.innerHTML = '<span class="queue-meta">Queue is empty.</span>';
         return;
       }
-      autoQueueList.innerHTML = queue.slice(-6).reverse().map(item => {
+      const displayQueue = queue
+        .map((item, index) => ({ item, index }))
+        .sort((left, right) => {
+          const priority = (entry) => entry.item.status === 'ready' ? 0 : entry.item.status.startsWith('generating') ? 1 : entry.item.status === 'error' ? 2 : 3;
+          return priority(left) - priority(right) || left.index - right.index;
+        })
+        .slice(0, 8);
+      const firstReadyIndex = displayQueue.findIndex(entry => entry.item.status === 'ready');
+      autoQueueList.innerHTML = displayQueue.map((entry, displayIndex) => {
+        const item = entry.item;
         const stage = itemStage(item);
         const preview = item.assistantText || item.error || '';
         const created = item.readyAt || item.textReadyAt || item.createdAt || '';
         return '<div class="queue-item">' +
           '<div class="queue-head">' +
             '<span class="queue-badge ' + esc(stage.tone) + '">' + esc(stage.label) + '</span>' +
+            (displayIndex === firstReadyIndex ? '<span class="queue-badge">次に再生</span>' : '') +
             (item.topicLabel ? '<span class="queue-badge pending">' + esc(item.topicLabel) + '</span>' : '') +
             '<span class="queue-meta">' + esc((item.id || '').slice(0, 8)) + '</span>' +
             '<span class="queue-meta">' + esc(created) + '</span>' +

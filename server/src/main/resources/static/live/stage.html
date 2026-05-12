@@ -229,6 +229,7 @@
   <script type="module">
     let lastUpdatedAt = null;
     let lastAudioUrl = null;
+    let speakingStartedAt = 0;
     let stageVolume = readStoredStageVolume();
     let audioEnabled = stageVolume > 0;
     let currentStatus = 'idle';
@@ -285,7 +286,7 @@
       localStorage.setItem('liveStageVolume', String(stageVolume));
       audio.volume = stageVolume;
       updateAudioVolumeLabel();
-      applyBgmDucking(!audio.paused && !audio.ended);
+      applyBgmDucking(isSpeechPlaying());
       if (!audioEnabled) {
         audio.pause();
         bgmAudio.pause();
@@ -294,11 +295,6 @@
       setupAudioAnalysis();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       applyBgmSettings(shouldStartAudio);
-      if (shouldStartAudio && audio.src) {
-        audio.play().catch(() => {
-          audioVolumeLabel.textContent = 'click/adjust';
-        });
-      }
     }
 
     function updateAudioVolumeLabel() {
@@ -317,15 +313,34 @@
       audio.src = url + '?t=' + Date.now();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
       audio.volume = stageVolume;
+      speakingStartedAt = Date.now();
       applyBgmDucking(true);
       setupAudioAnalysis();
-      audio.play().catch(() => {});
+      audio.play().catch(() => {
+        speakingStartedAt = 0;
+      });
     }
 
-    audio.addEventListener('ended', () => applyBgmDucking(false));
-    audio.addEventListener('pause', () => {
-      if (audio.ended) applyBgmDucking(false);
+    audio.addEventListener('ended', () => {
+      speakingStartedAt = 0;
+      applyBgmDucking(false);
+      renderAutoStatus();
     });
+    audio.addEventListener('pause', () => {
+      if (audio.ended) {
+        speakingStartedAt = 0;
+        applyBgmDucking(false);
+        renderAutoStatus();
+      }
+    });
+
+    function isSpeechPlaying() {
+      if (!speakingStartedAt || audio.paused || audio.ended) return false;
+      if (!audio.duration || !Number.isFinite(audio.duration)) {
+        return Date.now() - speakingStartedAt < 120000;
+      }
+      return audio.currentTime < audio.duration - 0.05;
+    }
 
     function render(state) {
       if (!state || state.updatedAt === lastUpdatedAt) return;
@@ -436,7 +451,7 @@
       }
       const elapsed = (Date.now() - latestAutoStatusReceivedAt) / 1000;
       const next = Math.max(0, Number(latestAutoStatus.nextPlayInSeconds || 0) - elapsed);
-      if (!audio.paused && !audio.ended) {
+      if (isSpeechPlaying()) {
         target.textContent = '守護天使が話しています';
         return;
       }
@@ -445,7 +460,13 @@
         return;
       }
       if (Number(latestAutoStatus.readyCount || 0) > 0) {
-        target.textContent = '自動雑談中 | 次のひとことまで ' + formatCountdown(next);
+        if (latestAutoStatus.waitingReason === 'due' || next <= 0) {
+          target.textContent = '自動雑談中 | まもなく話します';
+        } else if (latestAutoStatus.waitingReason === 'gap') {
+          target.textContent = '自動雑談中 | 少し間を置いています';
+        } else {
+          target.textContent = '自動雑談中 | 次のひとことまで ' + formatCountdown(next);
+        }
         return;
       }
       if (Number(latestAutoStatus.generatingCount || 0) > 0) {

@@ -429,6 +429,7 @@ public class AutoTalkService {
         result.put("autoPlayCount", autoPlayCount);
         result.put("lastPlayedAt", lastPlayedAt == null ? null : lastPlayedAt.toString());
         result.put("lastAudioEndedAt", lastAudioEndedAt == null ? null : lastAudioEndedAt.toString());
+        result.put("waitingReason", waitingReason());
         result.put("nextPlayAt", nextPlayAt.toString());
         result.put("nextPlayInSeconds", Math.max(0, Instant.now().until(nextPlayAt, ChronoUnit.SECONDS)));
         result.put("readyCount", readyCount());
@@ -437,6 +438,20 @@ public class AutoTalkService {
         result.put("topicCount", topics.size());
         result.put("queue", queue.stream().map(AutoTalkItem::toMap).toList());
         return result;
+    }
+
+    private String waitingReason() {
+        if (!enabled) return "disabled";
+        if (readyCount() <= 0) {
+            return generating ? "generating" : "waiting_for_stock";
+        }
+        if (Instant.now().isBefore(nextAllowedPlayAt())) {
+            return "gap";
+        }
+        if (Instant.now().isBefore(nextPlayAt)) {
+            return "countdown";
+        }
+        return "due";
     }
 
     private void loadSettings() {
