@@ -1,7 +1,10 @@
 package com.example.guardianplants.service;
 
+import com.example.guardianplants.ServerSettingsRepository;
 import com.example.guardianplants.dto.ChatRequest;
 import com.example.guardianplants.dto.ServerMessage;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -16,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -25,12 +29,27 @@ import java.util.concurrent.TimeUnit;
 public class AutoTalkService {
     private static final Logger log = LoggerFactory.getLogger(AutoTalkService.class);
     private static final int MAX_QUEUE_ITEMS = 12;
+    private static final String SETTING_ENABLED = "live.auto.enabled";
+    private static final String SETTING_TARGET_READY_COUNT = "live.auto.targetReadyCount";
+    private static final String SETTING_TALK_INTERVAL_SECONDS = "live.auto.talkIntervalSeconds";
+    private static final String SETTING_MIN_GAP_SECONDS = "live.auto.minGapSeconds";
+    private static final String SETTING_TOPICS = "live.auto.topics";
+    private static final List<AutoTalkTopic> DEFAULT_TOPICS = List.of(
+        new AutoTalkTopic("current_photo", "写真の様子", true, 3, "写真から見える葉の色、姿勢、光、土の様子について自然に話す。"),
+        new AutoTalkTopic("plant_care", "育て方", true, 2, "水やり、日当たり、温度、置き場所、根腐れ予防など育て方の話をする。"),
+        new AutoTalkTopic("nearby_species", "近い品種", true, 1, "サンスベリアに近い品種や似た観葉植物の話を、写真の植物と関係づけて短く話す。"),
+        new AutoTalkTopic("plant_trivia", "植物豆知識", true, 1, "植物の仕組み、葉、根、乾燥への強さなどの豆知識をやさしく話す。"),
+        new AutoTalkTopic("seasonal", "季節の話", true, 1, "季節、気温、湿度、室内環境に合わせた植物の見守りポイントを話す。")
+    );
 
     private final ChatService chatService;
     private final TtsService ttsService;
     private final LiveAudioService liveAudioService;
     private final LiveStateService liveStateService;
     private final RequestTraceService traceService;
+    private final ServerSettingsRepository settingsRepository;
+    private final ObjectMapper objectMapper;
+    private final Random random = new Random();
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "auto-talk-worker");
         thread.setDaemon(true);
@@ -45,23 +64,31 @@ public class AutoTalkService {
     private int minGapSeconds = 30;
     private int autoPlayCount;
     private Instant lastPlayedAt;
+    private Instant lastAudioEndedAt;
+    private String currentAudioUrl;
     private Instant nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
+    private List<AutoTalkTopic> topics = new ArrayList<>(DEFAULT_TOPICS);
     private static final int START_PLAY_DELAY_SECONDS = 5;
 
     public AutoTalkService(ChatService chatService,
                            TtsService ttsService,
                            LiveAudioService liveAudioService,
                            LiveStateService liveStateService,
-                           RequestTraceService traceService) {
+                           RequestTraceService traceService,
+                           ServerSettingsRepository settingsRepository,
+                           ObjectMapper objectMapper) {
         this.chatService = chatService;
         this.ttsService = ttsService;
         this.liveAudioService = liveAudioService;
         this.liveStateService = liveStateService;
         this.traceService = traceService;
+        this.settingsRepository = settingsRepository;
+        this.objectMapper = objectMapper;
     }
 
     @PostConstruct
     void startWorker() {
+        loadSettings();
         executor.scheduleWithFixedDelay(this::safeTick, 3, 5, TimeUnit.SECONDS);
     }
 
@@ -80,6 +107,7 @@ public class AutoTalkService {
             talkIntervalSeconds = clamp(intValue(body.get("talkIntervalSeconds"), talkIntervalSeconds), 20, 600);
             minGapSeconds = clamp(intValue(body.get("minGapSeconds"), minGapSeconds), 0, 300);
         }
+        persistSettings();
         if (nextPlayAt.isBefore(Instant.now())) {
             nextPlayAt = nextScheduledPlayAt(Instant.now().plusSeconds(talkIntervalSeconds));
         }
@@ -89,6 +117,7 @@ public class AutoTalkService {
 
     public synchronized Map<String, Object> start() {
         enabled = true;
+        persistSettings();
         scheduleSoonIfReady();
         requestRefill();
         return snapshot();
@@ -96,6 +125,7 @@ public class AutoTalkService {
 
     public synchronized Map<String, Object> stop() {
         enabled = false;
+        persistSettings();
         return snapshot();
     }
 
@@ -112,6 +142,36 @@ public class AutoTalkService {
     public synchronized Map<String, Object> skip() {
         playNextReady(true);
         return snapshot();
+    }
+
+    public synchronized Map<String, Object> audioEnded(Map<String, Object> body) {
+        String audioUrl = body == null || body.get("audioUrl") == null ? null : String.valueOf(body.get("audioUrl"));
+        if (audioUrl == null || audioUrl.equals(currentAudioUrl)) {
+            lastAudioEndedAt = Instant.now();
+            nextPlayAt = nextScheduledPlayAt(nextPlayAt);
+        }
+        return snapshot();
+    }
+
+    public synchronized Map<String, Object> topics() {
+        return Map.of("topics", topics.stream().map(AutoTalkTopic::toMap).toList());
+    }
+
+    public synchronized Map<String, Object> updateTopics(Map<String, Object> body) {
+        Object value = body == null ? null : body.get("topics");
+        if (!(value instanceof List<?> list)) {
+            return topics();
+        }
+        List<AutoTalkTopic> next = new ArrayList<>();
+        for (Object item : list) {
+            AutoTalkTopic topic = AutoTalkTopic.from(item);
+            if (topic != null) {
+                next.add(topic);
+            }
+        }
+        topics = next.isEmpty() ? new ArrayList<>(DEFAULT_TOPICS) : next;
+        persistTopics();
+        return topics();
     }
 
     private void safeTick() {
@@ -152,7 +212,11 @@ public class AutoTalkService {
 
         try {
             String traceId = traceService.generateTraceId();
-            ChatRequest request = autoTalkRequest();
+            AutoTalkTopic topic = chooseTopic();
+            synchronized (this) {
+                item.topic(topic);
+            }
+            ChatRequest request = autoTalkRequest(topic);
             traceService.recordReceived(traceId, "live", "device=auto-talk");
             String assistantText = chatService.complete(request, traceId);
             synchronized (this) {
@@ -183,7 +247,7 @@ public class AutoTalkService {
         }
     }
 
-    private ChatRequest autoTalkRequest() {
+    private ChatRequest autoTalkRequest(AutoTalkTopic topic) {
         List<ServerMessage> messages = new ArrayList<>();
         messages.add(new ServerMessage("system", """
             あなたは観葉植物を見守る守護天使です。
@@ -194,6 +258,10 @@ public class AutoTalkService {
 
         StringBuilder prompt = new StringBuilder();
         prompt.append("今の植物の様子を見て、守護天使から自然に短く話題を振ってください。");
+        if (topic != null) {
+            prompt.append("\n今回の話題: ").append(topic.label()).append("\n");
+            prompt.append(topic.prompt()).append("\n");
+        }
         List<String> recent = recentUsedTexts();
         if (!recent.isEmpty()) {
             prompt.append("\n直近の発話です。似た内容は避けてください:\n");
@@ -258,6 +326,10 @@ public class AutoTalkService {
             autoPlayCount++;
         }
         lastPlayedAt = Instant.now();
+        currentAudioUrl = item.audioUrl();
+        if (currentAudioUrl == null || currentAudioUrl.isBlank()) {
+            lastAudioEndedAt = lastPlayedAt;
+        }
         nextPlayAt = nextScheduledPlayAt(lastPlayedAt.plusSeconds(talkIntervalSeconds));
         requestRefill();
     }
@@ -268,6 +340,29 @@ public class AutoTalkService {
             .filter(item -> item.assistantText() != null)
             .map(AutoTalkItem::assistantText)
             .toList();
+    }
+
+    private AutoTalkTopic chooseTopic() {
+        List<String> recentTopicIds = queue.stream()
+            .filter(item -> item.topicId() != null)
+            .skip(Math.max(0, queue.size() - 3))
+            .map(AutoTalkItem::topicId)
+            .toList();
+        List<AutoTalkTopic> enabledTopics = topics.stream()
+            .filter(AutoTalkTopic::enabled)
+            .toList();
+        List<AutoTalkTopic> candidates = enabledTopics.stream()
+            .filter(topic -> !recentTopicIds.contains(topic.id()))
+            .toList();
+        if (candidates.isEmpty()) candidates = enabledTopics;
+        if (candidates.isEmpty()) candidates = DEFAULT_TOPICS;
+        int totalWeight = candidates.stream().mapToInt(topic -> Math.max(1, topic.weight())).sum();
+        int pick = random.nextInt(Math.max(1, totalWeight));
+        for (AutoTalkTopic topic : candidates) {
+            pick -= Math.max(1, topic.weight());
+            if (pick < 0) return topic;
+        }
+        return candidates.get(0);
     }
 
     private void pruneOldItems() {
@@ -304,8 +399,9 @@ public class AutoTalkService {
     }
 
     private Instant nextAllowedPlayAt() {
-        if (lastPlayedAt == null) return Instant.now();
-        return lastPlayedAt.plusSeconds(minGapSeconds);
+        Instant base = lastAudioEndedAt != null ? lastAudioEndedAt : lastPlayedAt;
+        if (base == null) return Instant.now();
+        return base.plusSeconds(minGapSeconds);
     }
 
     private Instant nextScheduledPlayAt(Instant candidate) {
@@ -322,13 +418,76 @@ public class AutoTalkService {
         result.put("minGapSeconds", minGapSeconds);
         result.put("autoPlayCount", autoPlayCount);
         result.put("lastPlayedAt", lastPlayedAt == null ? null : lastPlayedAt.toString());
+        result.put("lastAudioEndedAt", lastAudioEndedAt == null ? null : lastAudioEndedAt.toString());
         result.put("nextPlayAt", nextPlayAt.toString());
         result.put("nextPlayInSeconds", Math.max(0, Instant.now().until(nextPlayAt, ChronoUnit.SECONDS)));
         result.put("readyCount", readyCount());
         result.put("generatingCount", queue.stream().filter(item -> item.status().startsWith("generating")).count());
         result.put("errorCount", queue.stream().filter(item -> "error".equals(item.status())).count());
+        result.put("topicCount", topics.size());
         result.put("queue", queue.stream().map(AutoTalkItem::toMap).toList());
         return result;
+    }
+
+    private void loadSettings() {
+        try {
+            enabled = settingsRepository.get(SETTING_ENABLED).map(Boolean::parseBoolean).orElse(enabled);
+            targetReadyCount = settingsRepository.get(SETTING_TARGET_READY_COUNT)
+                .map(value -> clamp(intValue(value, targetReadyCount), 1, 5))
+                .orElse(targetReadyCount);
+            talkIntervalSeconds = settingsRepository.get(SETTING_TALK_INTERVAL_SECONDS)
+                .map(value -> clamp(intValue(value, talkIntervalSeconds), 20, 600))
+                .orElse(talkIntervalSeconds);
+            minGapSeconds = settingsRepository.get(SETTING_MIN_GAP_SECONDS)
+                .map(value -> clamp(intValue(value, minGapSeconds), 0, 300))
+                .orElse(minGapSeconds);
+            topics = loadTopics();
+            nextPlayAt = Instant.now().plusSeconds(talkIntervalSeconds);
+        } catch (RuntimeException e) {
+            log.warn("Failed to load auto talk settings; using defaults", e);
+        }
+    }
+
+    private void persistSettings() {
+        try {
+            settingsRepository.set(SETTING_ENABLED, String.valueOf(enabled));
+            settingsRepository.set(SETTING_TARGET_READY_COUNT, String.valueOf(targetReadyCount));
+            settingsRepository.set(SETTING_TALK_INTERVAL_SECONDS, String.valueOf(talkIntervalSeconds));
+            settingsRepository.set(SETTING_MIN_GAP_SECONDS, String.valueOf(minGapSeconds));
+        } catch (RuntimeException e) {
+            log.warn("Failed to persist auto talk settings", e);
+        }
+    }
+
+    private List<AutoTalkTopic> loadTopics() {
+        try {
+            return settingsRepository.get(SETTING_TOPICS)
+                .map(json -> {
+                    try {
+                        List<Map<String, Object>> values = objectMapper.readValue(json, new TypeReference<>() {});
+                        List<AutoTalkTopic> loaded = values.stream()
+                            .map(AutoTalkTopic::fromMap)
+                            .filter(topic -> topic != null)
+                            .toList();
+                        return loaded.isEmpty() ? new ArrayList<>(DEFAULT_TOPICS) : new ArrayList<>(loaded);
+                    } catch (Exception e) {
+                        log.warn("Failed to parse auto talk topics; using defaults", e);
+                        return new ArrayList<>(DEFAULT_TOPICS);
+                    }
+                })
+                .orElseGet(() -> new ArrayList<>(DEFAULT_TOPICS));
+        } catch (RuntimeException e) {
+            log.warn("Failed to load auto talk topics; using defaults", e);
+            return new ArrayList<>(DEFAULT_TOPICS);
+        }
+    }
+
+    private void persistTopics() {
+        try {
+            settingsRepository.set(SETTING_TOPICS, objectMapper.writeValueAsString(topics.stream().map(AutoTalkTopic::toMap).toList()));
+        } catch (Exception e) {
+            log.warn("Failed to persist auto talk topics", e);
+        }
     }
 
     private int intValue(Object value, int fallback) {
@@ -358,6 +517,8 @@ public class AutoTalkService {
         private String audioUrl;
         private String error;
         private final String createdAt;
+        private String topicId;
+        private String topicLabel;
         private String textReadyAt;
         private String audioReadyAt;
         private String audioStatus;
@@ -382,6 +543,12 @@ public class AutoTalkService {
         String audioUrl() { return audioUrl; }
         void audioUrl(String audioUrl) { this.audioUrl = audioUrl; }
         void error(String error) { this.error = error; }
+        String topicId() { return topicId; }
+        void topic(AutoTalkTopic topic) {
+            if (topic == null) return;
+            this.topicId = topic.id();
+            this.topicLabel = topic.label();
+        }
         void textReadyAt(String textReadyAt) { this.textReadyAt = textReadyAt; }
         void audioReadyAt(String audioReadyAt) { this.audioReadyAt = audioReadyAt; }
         void audioStatus(String audioStatus) { this.audioStatus = audioStatus; }
@@ -395,6 +562,8 @@ public class AutoTalkService {
             map.put("assistantText", assistantText);
             map.put("audioUrl", audioUrl);
             map.put("error", error);
+            map.put("topicId", topicId);
+            map.put("topicLabel", topicLabel);
             map.put("createdAt", createdAt);
             map.put("textReadyAt", textReadyAt);
             map.put("audioReadyAt", audioReadyAt);
@@ -402,6 +571,60 @@ public class AutoTalkService {
             map.put("readyAt", readyAt);
             map.put("usedAt", usedAt);
             return map;
+        }
+    }
+
+    private record AutoTalkTopic(String id, String label, boolean enabled, int weight, String prompt) {
+        static AutoTalkTopic from(Object value) {
+            if (value instanceof Map<?, ?> map) {
+                Map<String, Object> normalized = new LinkedHashMap<>();
+                map.forEach((key, mapValue) -> normalized.put(String.valueOf(key), mapValue));
+                return fromMap(normalized);
+            }
+            return null;
+        }
+
+        static AutoTalkTopic fromMap(Map<String, Object> map) {
+            if (map == null) return null;
+            String id = stringValue(map.get("id"), UUID.randomUUID().toString()).trim();
+            String label = stringValue(map.get("label"), id).trim();
+            String prompt = stringValue(map.get("prompt"), "").trim();
+            if (id.isBlank() || label.isBlank() || prompt.isBlank()) return null;
+            boolean enabled = booleanValue(map.get("enabled"), true);
+            int weight = Math.max(1, Math.min(5, intValueStatic(map.get("weight"), 1)));
+            return new AutoTalkTopic(id, label, enabled, weight, prompt);
+        }
+
+        Map<String, Object> toMap() {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", id);
+            map.put("label", label);
+            map.put("enabled", enabled);
+            map.put("weight", weight);
+            map.put("prompt", prompt);
+            return map;
+        }
+
+        private static String stringValue(Object value, String fallback) {
+            return value == null ? fallback : String.valueOf(value);
+        }
+
+        private static boolean booleanValue(Object value, boolean fallback) {
+            if (value instanceof Boolean b) return b;
+            if (value instanceof String s) return Boolean.parseBoolean(s);
+            return fallback;
+        }
+
+        private static int intValueStatic(Object value, int fallback) {
+            if (value instanceof Number n) return n.intValue();
+            if (value instanceof String s && !s.isBlank()) {
+                try {
+                    return Integer.parseInt(s.trim());
+                } catch (NumberFormatException ignored) {
+                    return fallback;
+                }
+            }
+            return fallback;
         }
     }
 }

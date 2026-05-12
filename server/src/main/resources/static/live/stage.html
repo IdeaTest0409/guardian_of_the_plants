@@ -35,12 +35,12 @@
       inset: 0;
       display: grid;
       place-items: center;
-      background: #101614;
+      background: transparent;
     }
     .plant-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
       filter: saturate(1.08) contrast(1.04) brightness(1.04);
     }
     .plant-placeholder {
@@ -143,6 +143,23 @@
       text-overflow: ellipsis;
       text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     }
+    .auto-status {
+      position: absolute;
+      left: 4.5%;
+      top: 12.5%;
+      max-width: 42%;
+      padding: 7px 11px;
+      border-radius: 8px;
+      background: rgba(7, 13, 11, 0.38);
+      border: 1px solid rgba(178, 225, 202, 0.22);
+      color: #dceee5;
+      font-size: clamp(12px, 0.95vw, 16px);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
     .caption {
       position: absolute;
       left: 4.5%;
@@ -183,14 +200,18 @@
     </aside>
     <div id="model-loading" class="loading">angel_egna.glb loading...</div>
     <div id="user-text" class="user-text">スマホまたはPCからのメッセージ待ち</div>
+    <div id="auto-status" class="auto-status">Auto loading...</div>
     <div id="caption" class="caption">話しかけると、ここに守護天使の返答が表示されます。</div>
     <audio id="live-audio" preload="auto"></audio>
+    <audio id="bgm-audio" preload="auto" loop></audio>
   </main>
   <script type="module">
     let lastUpdatedAt = null;
     let lastAudioUrl = null;
     let audioEnabled = false;
     let currentStatus = 'idle';
+    let latestAutoStatus = null;
+    let latestAutoStatusReceivedAt = 0;
     let guardianModel = null;
     let mouthTargets = [];
     let mixer = null;
@@ -201,7 +222,7 @@
     let smoothedMouth = 0;
     let modelInfoLogged = false;
     let THREE_NS = null;
-    let liveSettings = { posePreset: 'auto', audioPlaybackRate: 1 };
+    let liveSettings = { posePreset: 'auto', audioPlaybackRate: 1, bgmEnabled: false, bgmVolume: 0.15, bgmTrack: 'peaceful_ambient' };
     let currentPosePreset = 'auto';
     let boneBaseRotations = [];
     let poseBones = [];
@@ -211,13 +232,22 @@
     let nextWalkTargetAt = 0;
 
     const audio = document.getElementById('live-audio');
+    const bgmAudio = document.getElementById('bgm-audio');
     const audioToggle = document.getElementById('audio-toggle');
+    audio.addEventListener('ended', () => {
+      fetch('/api/live/auto/audio-ended', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioUrl: lastAudioUrl })
+      }).catch(() => {});
+    });
     audioToggle.addEventListener('click', () => {
       audioEnabled = true;
       audioToggle.classList.add('enabled');
       audioToggle.textContent = 'Audio Enabled';
       setupAudioAnalysis();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
+      applyBgmSettings(true);
       audio.play().catch(() => {});
     });
 
@@ -230,9 +260,15 @@
       lastAudioUrl = url;
       audio.src = url + '?t=' + Date.now();
       audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
+      applyBgmDucking(true);
       setupAudioAnalysis();
       audio.play().catch(() => {});
     }
+
+    audio.addEventListener('ended', () => applyBgmDucking(false));
+    audio.addEventListener('pause', () => {
+      if (audio.ended) applyBgmDucking(false);
+    });
 
     function render(state) {
       if (!state || state.updatedAt === lastUpdatedAt) return;
@@ -285,12 +321,93 @@
           const previousPreset = liveSettings.posePreset;
           liveSettings = {
             posePreset: settings.posePreset || 'auto',
-            audioPlaybackRate: Number(settings.audioPlaybackRate || 1)
+            audioPlaybackRate: Number(settings.audioPlaybackRate || 1),
+            bgmEnabled: Boolean(settings.bgmEnabled),
+            bgmVolume: Number(settings.bgmVolume || 0.15),
+            bgmTrack: settings.bgmTrack || 'peaceful_ambient',
+            bgmTracks: settings.bgmTracks || []
           };
           audio.playbackRate = Number(liveSettings.audioPlaybackRate || 1);
+          applyBgmSettings(audioEnabled);
           if (liveSettings.posePreset !== previousPreset) applyPosePreset();
         })
         .catch(() => {});
+    }
+
+    function selectedBgmUrl() {
+      if (!liveSettings.bgmEnabled || liveSettings.bgmTrack === 'none') return null;
+      const tracks = liveSettings.bgmTracks || [];
+      const track = tracks.find(item => item.id === liveSettings.bgmTrack);
+      return track ? track.url : null;
+    }
+
+    function applyBgmSettings(shouldPlay) {
+      const url = selectedBgmUrl();
+      if (!url) {
+        bgmAudio.pause();
+        bgmAudio.removeAttribute('src');
+        return;
+      }
+      if (!bgmAudio.src || !bgmAudio.src.includes(url)) {
+        bgmAudio.src = url;
+      }
+      applyBgmDucking(!audio.paused && !audio.ended);
+      if (audioEnabled && shouldPlay !== false) {
+        bgmAudio.play().catch(() => {});
+      }
+    }
+
+    function applyBgmDucking(isSpeaking) {
+      const baseVolume = Math.max(0, Math.min(1, Number(liveSettings.bgmVolume || 0.15)));
+      bgmAudio.volume = isSpeaking ? Math.max(0.03, baseVolume * 0.45) : baseVolume;
+    }
+
+    function formatCountdown(seconds) {
+      const value = Math.max(0, Math.ceil(Number(seconds || 0)));
+      const minutes = Math.floor(value / 60);
+      const rest = value % 60;
+      if (minutes <= 0) return rest + 's';
+      return minutes + 'm ' + String(rest).padStart(2, '0') + 's';
+    }
+
+    function renderAutoStatus() {
+      const target = document.getElementById('auto-status');
+      if (!latestAutoStatus) {
+        target.textContent = 'Auto loading...';
+        return;
+      }
+      const elapsed = (Date.now() - latestAutoStatusReceivedAt) / 1000;
+      const next = Math.max(0, Number(latestAutoStatus.nextPlayInSeconds || 0) - elapsed);
+      if (!audio.paused && !audio.ended) {
+        target.textContent = '守護天使が話しています';
+        return;
+      }
+      if (!latestAutoStatus.enabled) {
+        target.textContent = '手動応答モード';
+        return;
+      }
+      if (Number(latestAutoStatus.readyCount || 0) > 0) {
+        target.textContent = '自動雑談中 | 次のひとことまで ' + formatCountdown(next);
+        return;
+      }
+      if (Number(latestAutoStatus.generatingCount || 0) > 0) {
+        target.textContent = '自動雑談準備中 | 返答を作成しています';
+        return;
+      }
+      target.textContent = '自動雑談待機中';
+    }
+
+    function loadAutoStatus() {
+      fetch('/api/live/auto', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
+          latestAutoStatus = data;
+          latestAutoStatusReceivedAt = Date.now();
+          renderAutoStatus();
+        })
+        .catch(() => {
+          document.getElementById('auto-status').textContent = 'Auto offline';
+        });
     }
 
     function errorDetails(error, extra = {}) {
@@ -696,8 +813,11 @@
     startGuardian3d();
     loadState();
     loadSettings();
+    loadAutoStatus();
     setInterval(loadState, 1000);
     setInterval(loadSettings, 2000);
+    setInterval(loadAutoStatus, 5000);
+    setInterval(renderAutoStatus, 1000);
   </script>
 </body>
 </html>

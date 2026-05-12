@@ -1,8 +1,12 @@
 package com.example.guardianplants.service;
 
+import com.example.guardianplants.ServerSettingsRepository;
 import com.example.guardianplants.dto.ChatRequest;
 import com.example.guardianplants.dto.ServerMessage;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -15,12 +19,24 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class LiveStateService {
+    private static final Logger log = LoggerFactory.getLogger(LiveStateService.class);
 
     private static final int MAX_USER_DISPLAY_CHARS = 120;
     private static final int MAX_ASSISTANT_DISPLAY_CHARS = 280;
     private static final String DEFAULT_POSE_PRESET = "auto";
     private static final String DEFAULT_PLANT_IMAGE_SOURCE = "smartphone";
     private static final double DEFAULT_AUDIO_PLAYBACK_RATE = 1.0;
+    private static final boolean DEFAULT_BGM_ENABLED = false;
+    private static final double DEFAULT_BGM_VOLUME = 0.15;
+    private static final String DEFAULT_BGM_TRACK = "peaceful_ambient";
+    private static final String SETTING_POSE_PRESET = "live.posePreset";
+    private static final String SETTING_PLANT_IMAGE_SOURCE = "live.plantImageSource";
+    private static final String SETTING_AUDIO_PLAYBACK_RATE = "live.audioPlaybackRate";
+    private static final String SETTING_BGM_ENABLED = "live.bgm.enabled";
+    private static final String SETTING_BGM_VOLUME = "live.bgm.volume";
+    private static final String SETTING_BGM_TRACK = "live.bgm.track";
+
+    private final ServerSettingsRepository settingsRepository;
 
     private final AtomicReference<LiveState> state = new AtomicReference<>(
         new LiveState(
@@ -35,8 +51,18 @@ public class LiveStateService {
         )
     );
     private final AtomicReference<LiveSettings> settings = new AtomicReference<>(
-        new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE, DEFAULT_AUDIO_PLAYBACK_RATE)
+        new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE, DEFAULT_AUDIO_PLAYBACK_RATE,
+            DEFAULT_BGM_ENABLED, DEFAULT_BGM_VOLUME, DEFAULT_BGM_TRACK)
     );
+
+    public LiveStateService(ServerSettingsRepository settingsRepository) {
+        this.settingsRepository = settingsRepository;
+    }
+
+    @PostConstruct
+    void loadPersistedSettings() {
+        settings.set(loadSettings());
+    }
 
     public Map<String, Object> currentState() {
         return state.get().toMap();
@@ -57,12 +83,25 @@ public class LiveStateService {
         double audioPlaybackRate = request == null
             ? previous.audioPlaybackRate()
             : doubleValue(request.get("audioPlaybackRate"), previous.audioPlaybackRate());
+        boolean bgmEnabled = request == null
+            ? previous.bgmEnabled()
+            : booleanValue(request.get("bgmEnabled"), previous.bgmEnabled());
+        double bgmVolume = request == null
+            ? previous.bgmVolume()
+            : doubleValue(request.get("bgmVolume"), previous.bgmVolume());
+        String bgmTrack = request == null
+            ? previous.bgmTrack()
+            : String.valueOf(request.getOrDefault("bgmTrack", previous.bgmTrack()));
         LiveSettings next = new LiveSettings(
             normalizePosePreset(posePreset),
             normalizePlantImageSource(plantImageSource),
-            normalizeAudioPlaybackRate(audioPlaybackRate)
+            normalizeAudioPlaybackRate(audioPlaybackRate),
+            bgmEnabled,
+            normalizeBgmVolume(bgmVolume),
+            normalizeBgmTrack(bgmTrack)
         );
         settings.set(next);
+        persistSettings(next);
         return next.toMap();
     }
 
@@ -318,6 +357,67 @@ public class LiveStateService {
         return Math.round(clamped * 10.0) / 10.0;
     }
 
+    private boolean booleanValue(Object value, boolean fallback) {
+        if (value instanceof Boolean b) return b;
+        if (value instanceof String s && !s.isBlank()) return Boolean.parseBoolean(s.trim());
+        return fallback;
+    }
+
+    private double normalizeBgmVolume(double value) {
+        double clamped = Math.max(0.0, Math.min(1.0, value));
+        return Math.round(clamped * 100.0) / 100.0;
+    }
+
+    private String normalizeBgmTrack(String value) {
+        if (value == null || value.isBlank()) return DEFAULT_BGM_TRACK;
+        return switch (value.trim()) {
+            case "peaceful_ambient", "none" -> value.trim();
+            default -> DEFAULT_BGM_TRACK;
+        };
+    }
+
+    private LiveSettings loadSettings() {
+        try {
+            String posePreset = settingsRepository.get(SETTING_POSE_PRESET).orElse(DEFAULT_POSE_PRESET);
+            String plantImageSource = settingsRepository.get(SETTING_PLANT_IMAGE_SOURCE).orElse(DEFAULT_PLANT_IMAGE_SOURCE);
+            double audioPlaybackRate = settingsRepository.get(SETTING_AUDIO_PLAYBACK_RATE)
+                .map(value -> doubleValue(value, DEFAULT_AUDIO_PLAYBACK_RATE))
+                .orElse(DEFAULT_AUDIO_PLAYBACK_RATE);
+            boolean bgmEnabled = settingsRepository.get(SETTING_BGM_ENABLED)
+                .map(value -> booleanValue(value, DEFAULT_BGM_ENABLED))
+                .orElse(DEFAULT_BGM_ENABLED);
+            double bgmVolume = settingsRepository.get(SETTING_BGM_VOLUME)
+                .map(value -> doubleValue(value, DEFAULT_BGM_VOLUME))
+                .orElse(DEFAULT_BGM_VOLUME);
+            String bgmTrack = settingsRepository.get(SETTING_BGM_TRACK).orElse(DEFAULT_BGM_TRACK);
+            return new LiveSettings(
+                normalizePosePreset(posePreset),
+                normalizePlantImageSource(plantImageSource),
+                normalizeAudioPlaybackRate(audioPlaybackRate),
+                bgmEnabled,
+                normalizeBgmVolume(bgmVolume),
+                normalizeBgmTrack(bgmTrack)
+            );
+        } catch (RuntimeException e) {
+            log.warn("Failed to load live settings; using defaults", e);
+            return new LiveSettings(DEFAULT_POSE_PRESET, DEFAULT_PLANT_IMAGE_SOURCE, DEFAULT_AUDIO_PLAYBACK_RATE,
+                DEFAULT_BGM_ENABLED, DEFAULT_BGM_VOLUME, DEFAULT_BGM_TRACK);
+        }
+    }
+
+    private void persistSettings(LiveSettings next) {
+        try {
+            settingsRepository.set(SETTING_POSE_PRESET, next.posePreset());
+            settingsRepository.set(SETTING_PLANT_IMAGE_SOURCE, next.plantImageSource());
+            settingsRepository.set(SETTING_AUDIO_PLAYBACK_RATE, String.valueOf(next.audioPlaybackRate()));
+            settingsRepository.set(SETTING_BGM_ENABLED, String.valueOf(next.bgmEnabled()));
+            settingsRepository.set(SETTING_BGM_VOLUME, String.valueOf(next.bgmVolume()));
+            settingsRepository.set(SETTING_BGM_TRACK, next.bgmTrack());
+        } catch (RuntimeException e) {
+            log.warn("Failed to persist live settings", e);
+        }
+    }
+
     private record LiveState(
         String sessionId,
         String status,
@@ -342,12 +442,25 @@ public class LiveStateService {
         }
     }
 
-    private record LiveSettings(String posePreset, String plantImageSource, double audioPlaybackRate) {
+    private record LiveSettings(String posePreset, String plantImageSource, double audioPlaybackRate,
+                                boolean bgmEnabled, double bgmVolume, String bgmTrack) {
         Map<String, Object> toMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("posePreset", posePreset);
             map.put("plantImageSource", plantImageSource);
             map.put("audioPlaybackRate", audioPlaybackRate);
+            map.put("bgmEnabled", bgmEnabled);
+            map.put("bgmVolume", bgmVolume);
+            map.put("bgmTrack", bgmTrack);
+            map.put("bgmTracks", List.of(
+                Map.of(
+                    "id", "peaceful_ambient",
+                    "label", "Peaceful Ambient Music",
+                    "url", "/live/assets/audio/peaceful-ambient-music.mp3",
+                    "license", "CC BY 4.0",
+                    "source", "Orange Free Sounds / Alexander Blu"
+                )
+            ));
             return map;
         }
     }

@@ -246,6 +246,22 @@
       line-height: 1.45;
     }
     .queue-lines b { color: #2b3f37; }
+    .topic-item {
+      display: grid;
+      gap: 8px;
+      padding: 10px 0;
+      border-top: 1px solid #d7dfdc;
+    }
+    .topic-item:first-child { border-top: 0; }
+    .topic-row {
+      display: grid;
+      grid-template-columns: auto 1fr 92px;
+      gap: 8px;
+      align-items: center;
+    }
+    .topic-row input[type="checkbox"] {
+      width: auto;
+    }
     .hint {
       color: #66746f;
       font-size: 13px;
@@ -353,6 +369,14 @@
         <div id="auto-summary" class="auto-summary"></div>
         <div id="auto-queue-status" class="log"></div>
         <div id="auto-queue-list" class="result"></div>
+        <details class="control-group">
+          <summary>Topic Library</summary>
+          <div id="topic-list" class="result"></div>
+          <div class="inline-actions">
+            <button id="topic-add" class="secondary" type="button">Add Topic</button>
+            <button id="topic-save" type="button">Save Topics</button>
+          </div>
+        </details>
       </details>
 
       <details class="control-group">
@@ -373,6 +397,22 @@
         </select>
         <label for="audio-playback-rate">Audio speed</label>
         <select id="audio-playback-rate"></select>
+        <div class="toggle-row">
+          <input id="bgm-enabled" type="checkbox">
+          <label for="bgm-enabled">BGM</label>
+          <select id="bgm-track" title="BGM track"></select>
+        </div>
+        <label for="bgm-volume">BGM volume</label>
+        <select id="bgm-volume">
+          <option value="0.05">5%</option>
+          <option value="0.10">10%</option>
+          <option value="0.15" selected>15%</option>
+          <option value="0.20">20%</option>
+          <option value="0.25">25%</option>
+          <option value="0.30">30%</option>
+          <option value="0.40">40%</option>
+          <option value="0.50">50%</option>
+        </select>
         <div class="hint">
           Pose changes are saved on the server and applied to the stage preview and OBS/browser stage.
         </div>
@@ -435,8 +475,12 @@
     const autoMinGapSeconds = document.getElementById('auto-min-gap-seconds');
     const autoQueueStatus = document.getElementById('auto-queue-status');
     const autoQueueList = document.getElementById('auto-queue-list');
+    const topicList = document.getElementById('topic-list');
     const posePreset = document.getElementById('pose-preset');
     const audioPlaybackRate = document.getElementById('audio-playback-rate');
+    const bgmEnabled = document.getElementById('bgm-enabled');
+    const bgmTrack = document.getElementById('bgm-track');
+    const bgmVolume = document.getElementById('bgm-volume');
     const plantImageSourceInputs = Array.from(document.querySelectorAll('input[name="plant-image-source"]'));
     const plantImageFile = document.getElementById('plant-image-file');
     const plantImagePreview = document.getElementById('plant-image-preview');
@@ -452,6 +496,7 @@
     let activeAiProfileId = null;
     let latestAutoStatus = null;
     let latestAutoStatusReceivedAt = 0;
+    let autoTopics = [];
 
     function setLog(text) {
       log.textContent = text || '';
@@ -495,6 +540,14 @@
       audioPlaybackRate.value = '1.0';
     }
 
+    function renderBgmTracks(tracks, selectedTrack) {
+      const options = ['<option value="none">None</option>'].concat((tracks || []).map(track =>
+        '<option value="' + esc(track.id) + '">' + esc(track.label || track.id) + '</option>'
+      ));
+      bgmTrack.innerHTML = options.join('');
+      bgmTrack.value = selectedTrack || 'none';
+    }
+
     async function refresh() {
       const res = await fetch('/api/live/state', { cache: 'no-store' });
       render(await res.json());
@@ -504,8 +557,11 @@
     async function refreshSettings() {
       const res = await fetch('/api/live/settings', { cache: 'no-store' });
       const settings = await res.json();
+      renderBgmTracks(settings.bgmTracks || [], settings.bgmTrack || 'peaceful_ambient');
       posePreset.value = settings.posePreset || 'auto';
       audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
+      bgmEnabled.checked = Boolean(settings.bgmEnabled);
+      bgmVolume.value = String(Number(settings.bgmVolume || 0.15).toFixed(2));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
     }
 
@@ -517,14 +573,20 @@
         body: JSON.stringify({
           posePreset: posePreset.value,
           audioPlaybackRate: Number(audioPlaybackRate.value || 1),
+          bgmEnabled: bgmEnabled.checked,
+          bgmTrack: bgmTrack.value || 'peaceful_ambient',
+          bgmVolume: Number(bgmVolume.value || 0.15),
           plantImageSource
         })
       });
       const settings = await res.json();
+      renderBgmTracks(settings.bgmTracks || [], settings.bgmTrack || 'peaceful_ambient');
       posePreset.value = settings.posePreset || 'auto';
       audioPlaybackRate.value = String(Number(settings.audioPlaybackRate || 1).toFixed(1));
+      bgmEnabled.checked = Boolean(settings.bgmEnabled);
+      bgmVolume.value = String(Number(settings.bgmVolume || 0.15).toFixed(2));
       setPlantImageSource(settings.plantImageSource || 'smartphone');
-      setLog('settings saved: pose=' + posePreset.value + ', speed=' + audioPlaybackRate.value + ', imageSource=' + currentPlantImageSource());
+      setLog('settings saved: pose=' + posePreset.value + ', speed=' + audioPlaybackRate.value + ', bgm=' + bgmEnabled.checked + ', imageSource=' + currentPlantImageSource());
       reloadLivePreview();
     }
 
@@ -778,6 +840,7 @@
         return '<div class="queue-item">' +
           '<div class="queue-head">' +
             '<span class="queue-badge ' + esc(stage.tone) + '">' + esc(stage.label) + '</span>' +
+            (item.topicLabel ? '<span class="queue-badge pending">' + esc(item.topicLabel) + '</span>' : '') +
             '<span class="queue-meta">' + esc((item.id || '').slice(0, 8)) + '</span>' +
             '<span class="queue-meta">' + esc(created) + '</span>' +
           '</div>' +
@@ -819,6 +882,70 @@
       return data;
     }
 
+    function renderTopics() {
+      if (!autoTopics.length) {
+        topicList.innerHTML = '<span class="queue-meta">No topics.</span>';
+        return;
+      }
+      topicList.innerHTML = autoTopics.map((topic, index) =>
+        '<div class="topic-item" data-index="' + index + '">' +
+          '<div class="topic-row">' +
+            '<input class="topic-enabled" type="checkbox" ' + (topic.enabled ? 'checked' : '') + ' title="Enabled">' +
+            '<input class="topic-label" value="' + esc(topic.label || '') + '" placeholder="Topic label">' +
+            '<select class="topic-weight">' +
+              [1, 2, 3, 4, 5].map(weight =>
+                '<option value="' + weight + '"' + (Number(topic.weight || 1) === weight ? ' selected' : '') + '>w ' + weight + '</option>'
+              ).join('') +
+            '</select>' +
+          '</div>' +
+          '<textarea class="topic-prompt" rows="3" placeholder="Topic prompt">' + esc(topic.prompt || '') + '</textarea>' +
+          '<div class="inline-actions"><button class="topic-delete warn" type="button">Delete</button></div>' +
+        '</div>'
+      ).join('');
+      topicList.querySelectorAll('.topic-delete').forEach(button => {
+        button.addEventListener('click', () => {
+          const item = button.closest('.topic-item');
+          const index = Number(item.dataset.index);
+          autoTopics.splice(index, 1);
+          renderTopics();
+        });
+      });
+    }
+
+    function collectTopics() {
+      return Array.from(topicList.querySelectorAll('.topic-item')).map((item, index) => {
+        const existing = autoTopics[index] || {};
+        const label = item.querySelector('.topic-label').value.trim();
+        return {
+          id: existing.id || ('topic_' + Date.now() + '_' + index),
+          label,
+          enabled: item.querySelector('.topic-enabled').checked,
+          weight: Number(item.querySelector('.topic-weight').value || 1),
+          prompt: item.querySelector('.topic-prompt').value.trim()
+        };
+      }).filter(topic => topic.label && topic.prompt);
+    }
+
+    async function loadTopics() {
+      const res = await fetch('/api/live/auto/topics', { cache: 'no-store' });
+      const data = await res.json();
+      autoTopics = data.topics || [];
+      renderTopics();
+    }
+
+    async function saveTopics() {
+      autoTopics = collectTopics();
+      const res = await fetch('/api/live/auto/topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: autoTopics })
+      });
+      const data = await res.json();
+      autoTopics = data.topics || [];
+      renderTopics();
+      setLog('topics saved: ' + autoTopics.length);
+    }
+
     function setupAutoTopic() {
       autoTopic.addEventListener('change', async () => {
         const desiredEnabled = autoTopic.checked;
@@ -832,8 +959,22 @@
       document.getElementById('auto-refill').addEventListener('click', () => postAutoAction('refill').catch(e => setLog(String(e))));
       document.getElementById('auto-skip').addEventListener('click', () => postAutoAction('skip').catch(e => setLog(String(e))));
       document.getElementById('auto-clear').addEventListener('click', () => postAutoAction('clear').catch(e => setLog(String(e))));
+      document.getElementById('topic-add').addEventListener('click', () => {
+        autoTopics.push({
+          id: 'topic_' + Date.now(),
+          label: 'New Topic',
+          enabled: true,
+          weight: 1,
+          prompt: '植物に関係する新しい話題を短く自然に話す。'
+        });
+        renderTopics();
+      });
+      document.getElementById('topic-save').addEventListener('click', () => saveTopics().catch(e => setLog(String(e))));
       loadAutoStatus().catch(e => {
         autoQueueStatus.textContent = 'auto status error: ' + e.message;
+      });
+      loadTopics().catch(e => {
+        topicList.textContent = 'topic load error: ' + e.message;
       });
       setInterval(() => loadAutoStatus().catch(() => {}), 5000);
       setInterval(renderAutoCountdown, 1000);
@@ -898,6 +1039,9 @@
     plantImageFile.addEventListener('change', () => readSelectedImage(plantImageFile.files[0]));
     posePreset.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
     audioPlaybackRate.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    bgmEnabled.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    bgmTrack.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
+    bgmVolume.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
     plantImageSourceInputs.forEach(input => {
       input.addEventListener('change', () => saveSettings().catch(e => setLog(String(e))));
     });

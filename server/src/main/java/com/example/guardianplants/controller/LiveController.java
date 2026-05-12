@@ -166,6 +166,21 @@ public class LiveController {
         return autoTalkService.clear();
     }
 
+    @PostMapping("/auto/audio-ended")
+    public Map<String, Object> autoAudioEnded(@RequestBody(required = false) Map<String, Object> request) {
+        return autoTalkService.audioEnded(request);
+    }
+
+    @GetMapping("/auto/topics")
+    public Map<String, Object> autoTopics() {
+        return autoTalkService.topics();
+    }
+
+    @PostMapping("/auto/topics")
+    public Map<String, Object> autoTopics(@RequestBody Map<String, Object> request) {
+        return autoTalkService.updateTopics(request);
+    }
+
     @GetMapping("/audio/{id}")
     public ResponseEntity<?> audio(@PathVariable String id) {
         var audio = liveAudioService.get(id);
