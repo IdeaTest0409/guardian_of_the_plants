@@ -450,6 +450,7 @@
         <dt>Assistant</dt><dd id="assistantText"></dd>
         <dt>Audio</dt><dd id="audioUrl"></dd>
         <dt>Error</dt><dd id="error"></dd>
+        <dt>Version</dt><dd id="serverVersion"></dd>
       </dl>
     </section>
   </main>
@@ -497,6 +498,7 @@
     let latestAutoStatus = null;
     let latestAutoStatusReceivedAt = 0;
     let autoTopics = [];
+    let versionLoaded = false;
 
     function setLog(text) {
       log.textContent = text || '';
@@ -552,6 +554,21 @@
       const res = await fetch('/api/live/state', { cache: 'no-store' });
       render(await res.json());
       await refreshSettings();
+      if (!versionLoaded) {
+        await loadVersion();
+      }
+    }
+
+    async function loadVersion() {
+      const res = await fetch('/api/logs/version', { cache: 'no-store' });
+      const version = await res.json();
+      versionLoaded = true;
+      const commit = String(version.commit || 'unknown');
+      document.getElementById('serverVersion').textContent =
+        (version.version || 'unknown') +
+        ' / ' + commit.slice(0, 8) +
+        ' / ' + (version.environment || 'local') +
+        ' / built ' + (version.buildTime || 'unknown');
     }
 
     async function refreshSettings() {
@@ -741,17 +758,41 @@
         setPlantImageDataUrl(null);
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = String(reader.result || '');
+      fitImageFileToStageDataUrl(file).then(dataUrl => {
         setPlantImageDataUrl(dataUrl);
         publishPlantImage(dataUrl).catch(e => setLog('image update error: ' + String(e)));
-      };
-      reader.onerror = () => {
+      }).catch(() => {
         setLog('image error: failed to read file');
         setPlantImageDataUrl(null);
-      };
-      reader.readAsDataURL(file);
+      });
+    }
+
+    function fitImageFileToStageDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const sourceUrl = String(reader.result || '');
+          const image = new Image();
+          image.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1280;
+            canvas.height = 720;
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+            const width = Math.round(image.naturalWidth * scale);
+            const height = Math.round(image.naturalHeight * scale);
+            const x = Math.round((canvas.width - width) / 2);
+            const y = Math.round((canvas.height - height) / 2);
+            context.drawImage(image, x, y, width, height);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          image.onerror = reject;
+          image.src = sourceUrl;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     }
 
     function formatCountdown(seconds) {

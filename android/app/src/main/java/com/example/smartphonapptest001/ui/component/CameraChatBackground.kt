@@ -46,7 +46,7 @@ fun CameraChatBackground(
     val latestOnFrameCaptured = rememberUpdatedState(onFrameCaptured)
     val previewView = remember(context, implementationMode) {
         PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
+            scaleType = PreviewView.ScaleType.FIT_CENTER
             this.implementationMode = implementationMode
         }
     }

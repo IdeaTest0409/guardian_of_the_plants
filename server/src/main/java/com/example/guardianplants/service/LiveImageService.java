@@ -50,6 +50,9 @@ public class LiveImageService {
     public String compressDataUrl(String dataUrl) {
         if (dataUrl == null || !dataUrl.trim().startsWith("data:image/")) return dataUrl;
         String normalized = dataUrl.trim();
+        if (normalized.startsWith("data:image/png")) {
+            return normalized;
+        }
         if (normalized.length() <= TARGET_DATA_URL_CHARS && normalized.startsWith(JPEG_PREFIX)) {
             return normalized;
         }
